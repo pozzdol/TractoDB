@@ -4,17 +4,19 @@ TractoDB (from Latin 'tracto': to handle, to manage) is a modern minimalist desk
 
 ![TractoDB Screenshot](docs/screenshot.png)
 
-## Features (V1)
+## Features
 
-- **Multi-database support**: PostgreSQL, MySQL, SQLite, Redis
-- **Remote connections**: Connect to any database via IP + Port
-- **Query editor**: Monaco Editor (VS Code engine) with syntax highlighting and autocomplete
-- **Schema browser**: Navigate databases, tables, views, and columns
-- **Results grid**: Fast data grid with sorting and copy support
-- **Tab management**: Work with multiple queries and tables simultaneously
-- **Resizable panels**: Customize your workspace layout
-- **Dark / Light mode**: Automatic system detection + manual toggle
-- **Secure storage**: Passwords stored in OS Keychain (libsecret on Linux)
+- **Multi-database** — PostgreSQL, MySQL, SQLite, and Redis, each shown with its own brand icon
+- **Local & remote connections** — direct TCP (host + port) or a SQLite file, with optional SSL/TLS
+- **Query editor** — Monaco (VS Code engine) with syntax highlighting and schema- and alias-aware autocomplete
+- **Results grid** — column sorting, inline cell editing, infinite-scroll pagination, and copy as value / row JSON / `INSERT`
+- **Table viewer** — per-table **Data**, **DDL**, **Columns**, and **Info** tabs; edit columns and rows in place
+- **Schema browser** — navigate databases → tables → columns with per-engine metadata, indexes, and foreign keys
+- **Backup & restore** — guided wizards that drive the native CLI tools (`pg_dump`, `pg_restore`, `mysqldump`, `mysql`) with auto-detection and manual path override
+- **Production safety** — flag a connection as *Production* to block every write (INSERT/UPDATE/DELETE/DDL), with red warnings across the UI
+- **Tabs & layout** — multiple query/table tabs and resizable sidebar / results / info panels, all persisted across restarts
+- **Theming** — light, dark, or follow-system (auto-tracks OS theme changes)
+- **Secure storage** — passwords in the OS keychain (libsecret / Keychain / Credential Vault), with an AES-256-GCM encrypted-file fallback; query history kept locally
 
 ## Requirements
 
@@ -29,7 +31,15 @@ sudo apt install libsecret-1-dev
 
 # For AppImage
 sudo apt install libfuse2
+
+# Optional — only needed for Backup & Restore, per engine you use
+sudo apt install postgresql-client   # pg_dump, pg_restore, psql
+sudo apt install mysql-client        # mysqldump, mysql
 ```
+
+> TractoDB is a management tool only — it does **not** bundle any database engine
+> or CLI tool. Install the engines and client tools you need separately; TractoDB
+> connects to whatever is already running and auto-detects the CLI tools from PATH.
 
 ### macOS
 
@@ -85,10 +95,10 @@ This project is designed to be built with Claude Code. Key files:
 
 ### Starting a new Claude Code session
 
-Paste this prompt:
+V1 is complete (see `TASKS.md`). To pick up new work, paste:
 ```
 Read CONTEXT.md, CLAUDE.md, AGENTS.md, and DESIGN.md first.
-Then check TASKS.md and continue from the first uncompleted task.
+Then check TASKS.md for status before starting.
 ```
 
 ## Tech Stack
@@ -99,6 +109,9 @@ Then check TASKS.md and continue from the first uncompleted task.
 - **Monaco Editor** — Query editor (VS Code engine)
 - **Zustand** — State management
 - **CSS Modules** — Styling (no CSS framework)
+- **pg / mysql2 / better-sqlite3 / ioredis** — Database protocol clients
+- **keytar** — OS keychain access for passwords
+- **electron-builder** — Packaging (.deb / .AppImage)
 - **bun** — Package manager
 
 ## License
