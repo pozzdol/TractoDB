@@ -81,6 +81,7 @@ export default defineConfig(({ command }) => {
       }),
       renderer(),
     ],
+    assetsInclude: ['**/*.svg'],
     build: {
       outDir: 'dist',
       emptyOutDir: true,
