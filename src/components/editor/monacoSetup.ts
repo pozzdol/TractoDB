@@ -9,8 +9,8 @@ self.MonacoEnvironment = {
   getWorker: () => new EditorWorker(),
 }
 
-export const LIGHT_THEME = 'dbstudio-light'
-export const DARK_THEME = 'dbstudio-dark'
+export const LIGHT_THEME = 'tractodb-light'
+export const DARK_THEME = 'tractodb-dark'
 
 // SQL keyword set for autocomplete (kept small and common).
 const KEYWORDS = [

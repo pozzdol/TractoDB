@@ -405,7 +405,7 @@ export function ipcError(error: string, code?: string): IpcError {
   return { success: false, error, code }
 }
 
-// ─── Renderer-facing API (window.dbstudio) ─────────────────────────────────────
+// ─── Renderer-facing API (window.tractodb) ─────────────────────────────────────
 //
 // This is the ONLY surface the renderer may touch — it never calls ipcRenderer
 // or Node APIs directly (see AGENTS.md). preload.ts implements this interface by
@@ -482,6 +482,6 @@ export type MenuAction = 'backup' | 'restore'
 
 declare global {
   interface Window {
-    dbstudio: DbStudioApi
+    tractodb: DbStudioApi
   }
 }

@@ -4,7 +4,7 @@ import type { BackupProgress, DbStudioApi, MenuAction } from '../shared/ipc'
 
 /**
  * The contextBridge surface. The renderer reaches the main process ONLY through
- * `window.dbstudio.*` — never `ipcRenderer` or Node APIs directly. Each method
+ * `window.tractodb.*` — never `ipcRenderer` or Node APIs directly. Each method
  * forwards to `ipcRenderer.invoke` and resolves with an `IpcResponse<T>`.
  */
 const api: DbStudioApi = {
@@ -75,4 +75,4 @@ const api: DbStudioApi = {
   },
 }
 
-contextBridge.exposeInMainWorld('dbstudio', api)
+contextBridge.exposeInMainWorld('tractodb', api)

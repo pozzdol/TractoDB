@@ -33,7 +33,7 @@ export function TitleBar() {
   return (
     <header className={styles.bar}>
       <div className={styles.left}>
-        <span className={styles.wordmark}>DBStudio</span>
+        <span className={styles.wordmark}>TractoDB</span>
         <IconButton
           label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
           active={!sidebarCollapsed}

@@ -20,11 +20,18 @@ import type {
   UserPreferences,
 } from '../../shared/ipc'
 import { describeError } from './drivers/base'
-import { deleteSecret, getSecret, getSecretsBackend, setSecret } from './secrets'
+import {
+  deleteSecret,
+  getSecret,
+  getSecretsBackend,
+  migrateKeychainPasswords,
+  setSecret,
+} from './secrets'
 
 // Passwords → OS keychain (or AES-encrypted fallback). Metadata → flat JSON
-// under ~/.dbstudio/ (DBeaver-style).
-const DIR = path.join(os.homedir(), '.dbstudio')
+// under ~/.tractodb/ (DBeaver-style).
+const DIR = path.join(os.homedir(), '.tractodb')
+const OLD_DIR = path.join(os.homedir(), '.dbstudio') // pre-rename; migration source only
 const CONNECTIONS_FILE = path.join(DIR, 'connections.json')
 const LAYOUT_FILE = path.join(DIR, 'layout.json')
 const PREFERENCES_FILE = path.join(DIR, 'preferences.json')
@@ -46,6 +53,31 @@ async function writeJson(file: string, data: unknown): Promise<void> {
 
 function nowIso(): string {
   return new Date().toISOString()
+}
+
+async function exists(p: string): Promise<boolean> {
+  return fs.access(p).then(() => true, () => false)
+}
+
+/**
+ * One-time rename migration (DBStudio → TractoDB). On first launch after the
+ * rename, copy the old ~/.dbstudio/ directory to ~/.tractodb/ (left as a
+ * backup, never deleted) and re-key any keychain passwords. Idempotent.
+ */
+export async function runStartupMigrations(): Promise<void> {
+  try {
+    if ((await exists(OLD_DIR)) && !(await exists(DIR))) {
+      await fs.mkdir(DIR, { recursive: true })
+      for (const name of await fs.readdir(OLD_DIR)) {
+        await fs.copyFile(path.join(OLD_DIR, name), path.join(DIR, name)).catch(() => {})
+      }
+      console.warn('Migrated config from ~/.dbstudio to ~/.tractodb')
+    }
+    const ids = (await loadConnections()).map((c) => c.id)
+    if (ids.length) await migrateKeychainPasswords(ids)
+  } catch {
+    // Migration is best-effort — a fresh install (no old dir) is the common case.
+  }
 }
 
 // ─── Password access (used by the connection manager) ──────────────────────────

@@ -48,8 +48,13 @@ export default function App() {
   })
 
   useEffect(() => {
-    document.title = activeConnectionName ? `DBStudio — ${activeConnectionName}` : 'DBStudio'
-  }, [activeConnectionName])
+    let title = 'TractoDB'
+    if (activeConnectionName) {
+      title += ` — ${activeConnectionName}`
+      if (activeTab) title += ` · ${activeTab.title}`
+    }
+    document.title = title
+  }, [activeConnectionName, activeTab])
 
   useEffect(() => {
     void hydrate()

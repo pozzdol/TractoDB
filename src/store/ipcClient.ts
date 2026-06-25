@@ -2,13 +2,13 @@ import type { DbStudioApi, IpcResponse } from '@shared/ipc'
 
 /**
  * Safe accessor for the preload bridge. Stores call `api().connection.connect(...)`
- * etc. — never `window.dbstudio` directly, so a missing bridge fails loudly with
+ * etc. — never `window.tractodb` directly, so a missing bridge fails loudly with
  * a clear message instead of a `cannot read property of undefined`.
  */
 export function api(): DbStudioApi {
-  const bridge = window.dbstudio
+  const bridge = window.tractodb
   if (!bridge) {
-    throw new Error('Desktop bridge unavailable — DBStudio must run inside Electron.')
+    throw new Error('Desktop bridge unavailable — TractoDB must run inside Electron.')
   }
   return bridge
 }

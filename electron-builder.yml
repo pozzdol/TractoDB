@@ -1,6 +1,6 @@
-appId: com.dbstudio.app
-productName: DBStudio
-copyright: Copyright © 2024 DBStudio
+appId: com.tractodb.app
+productName: TractoDB
+copyright: Copyright © 2024 TractoDB
 
 directories:
   buildResources: build
@@ -16,7 +16,7 @@ linux:
     - AppImage
   icon: build/icon.png
   category: Development
-  description: Modern minimalist desktop database manager
+  description: TractoDB — handle and manage your databases
   maintainer: Fikri <fikri.anshori@tatametal.com>
 
 deb:

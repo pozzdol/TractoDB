@@ -10,12 +10,13 @@ export type { SecretsBackend }
 /**
  * Password storage. Prefers the OS keychain (keytar); if that's unavailable
  * (e.g. libsecret not installed on Linux), falls back to an AES-256-GCM
- * encrypted file under ~/.dbstudio/. Passwords are NEVER written in plain text
+ * encrypted file under ~/.tractodb/. Passwords are NEVER written in plain text
  * and NEVER logged.
  */
 
-const SERVICE = 'dbstudio'
-const DIR = path.join(os.homedir(), '.dbstudio')
+const SERVICE = 'tractodb'
+const OLD_SERVICE = 'dbstudio' // pre-rename; only read during one-time migration
+const DIR = path.join(os.homedir(), '.tractodb')
 const KEY_FILE = path.join(DIR, '.secret-key')
 const SECRETS_FILE = path.join(DIR, 'secrets.json')
 
@@ -119,5 +120,22 @@ export async function deleteSecret(id: string): Promise<void> {
   if (id in store) {
     delete store[id]
     await writeStore(store)
+  }
+}
+
+/**
+ * One-time keychain rename: move passwords stored under the old service name
+ * to the new one. Only relevant for the keychain backend — the AES-file store
+ * migrates with the config directory copy. Safe to call repeatedly.
+ */
+export async function migrateKeychainPasswords(ids: string[]): Promise<void> {
+  if ((await getSecretsBackend()) !== 'keychain') return
+  for (const id of ids) {
+    if (await keytar.getPassword(SERVICE, id)) continue // already migrated
+    const old = await keytar.getPassword(OLD_SERVICE, id)
+    if (old) {
+      await keytar.setPassword(SERVICE, id, old)
+      await keytar.deletePassword(OLD_SERVICE, id).catch(() => false)
+    }
   }
 }

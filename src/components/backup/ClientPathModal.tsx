@@ -96,7 +96,7 @@ export function ClientPathModal() {
       }
     >
       <p className={styles.intro}>
-        DBStudio uses your installed database client tools for backup and restore.
+        TractoDB uses your installed database client tools for backup and restore.
       </p>
       {row('postgresql', detection?.postgresql)}
       {row('mysql', detection?.mysql)}

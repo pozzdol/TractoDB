@@ -1,8 +1,8 @@
-# DBStudio
+# TractoDB
 
-Modern minimalist desktop database manager for Ubuntu. Inspired by DBeaver's power, designed with Linear's clarity.
+TractoDB (from Latin 'tracto': to handle, to manage) is a modern minimalist desktop database manager for Ubuntu. Inspired by DBeaver's power, designed with Linear's clarity.
 
-![DBStudio Screenshot](docs/screenshot.png)
+![TractoDB Screenshot](docs/screenshot.png)
 
 ## Features (V1)
 
@@ -41,8 +41,8 @@ xcode-select --install
 
 ```bash
 # Clone
-git clone https://github.com/yourname/dbstudio
-cd dbstudio
+git clone https://github.com/yourname/tractodb
+cd tractodb
 
 # Install dependencies (requires bun)
 bun install

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { IPC, type MenuAction } from '../shared/ipc'
 import { registerIpcHandlers } from './ipc'
 import { connectionManager } from './ipc/connection'
+import { runStartupMigrations } from './ipc/config'
 
 function buildMenu(): void {
   const sendAction = (action: MenuAction): void => {
@@ -44,7 +45,7 @@ function createWindow(): void {
     minWidth: 880,
     minHeight: 560,
     show: false,
-    title: 'DBStudio',
+    title: 'TractoDB',
     // Matches the light-theme --color-bg-primary so there's no white flash on
     // load. Phase 11 will sync this with the persisted theme preference.
     backgroundColor: '#ffffff',
@@ -77,7 +78,8 @@ function createWindow(): void {
 
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
+    await runStartupMigrations() // DBStudio → TractoDB data migration (one-time)
     registerIpcHandlers()
     buildMenu()
     createWindow()
@@ -90,7 +92,7 @@ app
     })
   })
   .catch((err: unknown) => {
-    console.error('Failed to start DBStudio:', err)
+    console.error('Failed to start TractoDB:', err)
     app.quit()
   })
 
