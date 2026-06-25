@@ -1,0 +1,46 @@
+.toolbar {
+  flex: 0 0 var(--toolbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--toolbar-height);
+  padding: 0 var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-accent-text);
+  background-color: var(--color-accent-subtle);
+  border-radius: var(--radius-md);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schema {
+  color: var(--color-accent);
+  opacity: 0.75;
+}
+
+.noConn {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}

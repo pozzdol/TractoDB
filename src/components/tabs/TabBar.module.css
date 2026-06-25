@@ -1,0 +1,108 @@
+.bar {
+  flex: 0 0 var(--tab-height);
+  display: flex;
+  align-items: stretch;
+  height: var(--tab-height);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  max-width: 200px;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  border-right: var(--border);
+  border-bottom: 2px solid transparent;
+  cursor: default;
+  user-select: none;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.tab:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.active {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border-bottom-color: var(--color-accent);
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.active .icon {
+  color: var(--color-accent);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.tab:hover .close,
+.active .close,
+.tab:focus-within .close {
+  opacity: 1;
+}
+
+.close:hover {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
+
+.add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast);
+}
+
+.add:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}

@@ -1,0 +1,31 @@
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+
+.connected {
+  background-color: var(--status-connected);
+}
+
+.connecting {
+  background-color: var(--status-connecting);
+}
+
+.disconnected {
+  background-color: var(--status-disconnected);
+}
+
+.error {
+  background-color: var(--status-error);
+}
+
+.loading {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-tertiary);
+}

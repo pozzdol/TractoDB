@@ -1,0 +1,61 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--titlebar-height);
+  flex: 0 0 var(--titlebar-height);
+  padding: 0 var(--space-6);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+  /* Electron frameless drag region (harmless when the OS frame is used). */
+  -webkit-app-region: drag;
+}
+
+.left,
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* Buttons must stay clickable inside the drag region. */
+  -webkit-app-region: no-drag;
+}
+
+.left {
+  flex: 0 0 auto;
+}
+
+.right {
+  flex: 0 0 auto;
+}
+
+.center {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.wordmark {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  margin-right: var(--space-2);
+}
+
+.connection,
+.connectionMuted {
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.connection {
+  color: var(--color-text-secondary);
+}
+
+.connectionMuted {
+  color: var(--color-text-tertiary);
+}

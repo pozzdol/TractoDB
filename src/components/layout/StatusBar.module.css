@@ -1,0 +1,52 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--statusbar-height);
+  flex: 0 0 var(--statusbar-height);
+  padding: 0 var(--space-6);
+  background-color: var(--color-statusbar-bg);
+  color: var(--color-statusbar-text);
+  font-size: var(--text-xs);
+}
+
+.section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.divider {
+  opacity: 0.5;
+}
+
+.error {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40vw;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+
+.dotConnected {
+  background-color: var(--status-connected);
+}
+
+.dotConnecting {
+  background-color: var(--status-connecting);
+}
+
+.dotDisconnected {
+  background-color: var(--status-disconnected);
+}
+
+.dotError {
+  background-color: var(--status-error);
+}

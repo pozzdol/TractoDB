@@ -1,0 +1,93 @@
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+bun.lockb
+
+# ─── Build Outputs ─────────────────────────────────────────────────────────────
+dist/
+dist-electron/
+release/
+out/
+.vite/
+
+# ─── TypeScript ───────────────────────────────────────────────────────────────
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ─── Electron / Native Modules ────────────────────────────────────────────────
+# Compiled native addons (better-sqlite3, keytar, etc.)
+*.node
+build/Release/
+build/Debug/
+
+# electron-builder temp files
+.electron-builder-effective-config.yaml
+
+# ─── Runtime App Data (generated at runtime, never committed) ─────────────────
+# These live in ~/.dbstudio/ on the user's machine — not in the repo
+config/*
+!config/.gitkeep
+
+# ─── Build Assets (keep folder, ignore generated icons/binaries) ──────────────
+# Put your app icon (icon.png 512×512, icon.icns, icon.ico) here manually
+# Ignore any auto-generated or binary build artifacts
+build/*
+!build/.gitkeep
+
+# ─── Docs (keep folder, ignore generated screenshots) ─────────────────────────
+docs/*
+!docs/.gitkeep
+
+# ─── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# ─── OS & Editor ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-error.log*
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.pem
+.cache/
+tmp/
+temp/
+
+# --- Markdown Helper ----------------------------------------------------------
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+DESIGN.md   
+TASKS.md
+# Keep the app icon tracked
+!build/icon.png

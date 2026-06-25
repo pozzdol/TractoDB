@@ -1,0 +1,66 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.select {
+  height: 30px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.hostCol {
+  flex: 1 1 auto;
+}
+
+.portCol {
+  flex: 0 0 96px;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.ok {
+  font-size: var(--text-sm);
+  color: var(--color-success);
+}
+
+.err {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}

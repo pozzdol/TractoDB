@@ -1,0 +1,50 @@
+/* Light theme tokens — mirrors DESIGN.md § Color System / Light Theme. */
+:root[data-theme='light'] {
+  /* Backgrounds */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f7f7f6;
+  --color-bg-tertiary: #efefed;
+  --color-bg-hover: #f0f0ee;
+  --color-bg-active: #e8e8e6;
+
+  /* Text */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #999999;
+  --color-text-disabled: #bbbbbb;
+  --color-text-inverse: #ffffff;
+
+  /* Borders */
+  --color-border-default: rgba(0, 0, 0, 0.09);
+  --color-border-strong: rgba(0, 0, 0, 0.16);
+  --color-border-focus: #185fa5;
+
+  /* Accent / Primary */
+  --color-accent: #185fa5;
+  --color-accent-hover: #125289; /* DESIGN.md lists #1252891 (invalid 7-digit hex); corrected. */
+  --color-accent-subtle: #e6f1fb;
+  --color-accent-text: #0c447c;
+
+  /* Semantic */
+  --color-success: #28c840;
+  --color-success-subtle: #eaf3de;
+  --color-warning: #ffbd2e;
+  --color-warning-subtle: #faeeda;
+  --color-danger: #e24b4a;
+  --color-danger-subtle: #fcebeb;
+  --color-info: #185fa5;
+  --color-info-subtle: #e6f1fb;
+
+  /* Status bar */
+  --color-statusbar-bg: #185fa5;
+  --color-statusbar-text: #b5d4f4;
+
+  /* Syntax highlighting */
+  --syntax-keyword: #185fa5;
+  --syntax-function: #0f6e56;
+  --syntax-string: #854f0b;
+  --syntax-number: #8b3a8b;
+  --syntax-comment: #888888;
+  --syntax-operator: #444444;
+  --syntax-type: #0f6e56;
+}

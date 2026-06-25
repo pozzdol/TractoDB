@@ -1,0 +1,15 @@
+.view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loading {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  padding: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}

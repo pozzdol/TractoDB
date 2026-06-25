@@ -1,0 +1,187 @@
+/*
+ * globals.css — DBStudio global tokens, resets, base styles.
+ * All values derive from DESIGN.md. No hardcoded colors/sizes in components.
+ */
+
+@import './themes/light.css';
+@import './themes/dark.css';
+
+:root {
+  /* ─── Typography ─────────────────────────────────────────────────── */
+  --font-sans: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 13px;
+  --text-lg: 14px;
+  --text-xl: 16px;
+  --text-2xl: 18px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  --leading-tight: 1.4;
+  --leading-normal: 1.6;
+  --leading-code: 1.7;
+
+  /* ─── Spacing (4pt-ish scale) ────────────────────────────────────── */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+
+  /* ─── Borders & Radius ───────────────────────────────────────────── */
+  --border-width: 0.5px;
+  --border: 0.5px solid var(--color-border-default);
+  --border-strong: 0.5px solid var(--color-border-strong);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-full: 9999px;
+
+  /* ─── Layout dimensions ──────────────────────────────────────────── */
+  --panel-sidebar-width: 220px;
+  --panel-sidebar-min: 160px;
+  --panel-sidebar-max: 400px;
+  --panel-right-width: 200px;
+  --panel-right-min: 160px;
+  --panel-right-max: 360px;
+  --panel-results-height: 200px;
+  --panel-results-min: 120px;
+
+  --titlebar-height: 36px;
+  --toolbar-height: 36px;
+  --tab-height: 34px;
+  --statusbar-height: 24px;
+
+  --divider-size: 4px;
+
+  /* ─── Motion ─────────────────────────────────────────────────────── */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 250ms ease;
+
+  /* ─── Database type colors (DESIGN.md § Database Type Colors) ─────── */
+  --db-postgresql: #336791;
+  --db-mysql: #e48e00;
+  --db-sqlite: #1d9e75;
+  --db-redis: #dc382d;
+  --db-mongodb: #47a248;
+  --db-mssql: #cc2927;
+
+  /* ─── Connection status dots (DESIGN.md § Status Indicators) ──────── */
+  --status-connected: #28c840;
+  --status-connecting: #ffbd2e;
+  --status-disconnected: #888780;
+  --status-error: #e24b4a;
+
+  /* Modal/scrim overlay (theme-independent). */
+  --color-overlay: rgba(0, 0, 0, 0.32);
+}
+
+/* ─── Reset ────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  /* Theme switch is the only thing that transitions on :root. */
+  transition:
+    background-color var(--transition-slow),
+    color var(--transition-slow);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden; /* desktop chrome — panels scroll internally, not the window */
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* ─── Scrollbars (DESIGN.md § Scrollbars) ──────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* ─── Focus & Accessibility (DESIGN.md § Focus & Accessibility) ────── */
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

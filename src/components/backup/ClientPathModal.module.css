@@ -1,0 +1,62 @@
+.intro {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-8);
+}
+
+.row {
+  padding: var(--space-5) 0;
+  border-top: var(--border);
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+}
+
+.found {
+  font-size: var(--text-xs);
+  color: var(--color-success);
+}
+
+.missing {
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}
+
+.detail {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.overrideRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.input {
+  flex: 1 1 auto;
+  height: 28px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+}

@@ -1,0 +1,138 @@
+.panel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.header {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  height: 28px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+}
+
+.tab {
+  padding: 0 var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  border-right: var(--border);
+  border-bottom: 2px solid transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.tab:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.active {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border-bottom-color: var(--color-accent);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+}
+
+.count {
+  padding: 1px var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-inverse);
+  background-color: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.timing {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.message {
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.error {
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-danger);
+}
+
+.messages {
+  overflow-y: auto;
+}
+
+.notice {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+}
+
+.history {
+  overflow-y: auto;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  text-align: left;
+  border-bottom: var(--border);
+  transition: background-color var(--transition-fast);
+}
+
+.historyItem:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.historyTime {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.historySql {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.historyStat {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.historyErr {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}

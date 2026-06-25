@@ -1,0 +1,50 @@
+/* Dark theme tokens — mirrors DESIGN.md § Color System / Dark Theme. */
+:root[data-theme='dark'] {
+  /* Backgrounds */
+  --color-bg-primary: #1e1e1e;
+  --color-bg-secondary: #252525;
+  --color-bg-tertiary: #1a1a1a;
+  --color-bg-hover: #2c2c2c;
+  --color-bg-active: #333333;
+
+  /* Text */
+  --color-text-primary: #e8e8e8;
+  --color-text-secondary: #999999;
+  --color-text-tertiary: #666666;
+  --color-text-disabled: #444444;
+  --color-text-inverse: #1a1a1a;
+
+  /* Borders */
+  --color-border-default: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.14);
+  --color-border-focus: #4a9fe0;
+
+  /* Accent / Primary */
+  --color-accent: #4a9fe0;
+  --color-accent-hover: #5aaff0;
+  --color-accent-subtle: #0c2a42;
+  --color-accent-text: #b5d4f4;
+
+  /* Semantic */
+  --color-success: #28c840;
+  --color-success-subtle: #0a2a0f;
+  --color-warning: #ffbd2e;
+  --color-warning-subtle: #2a1f00;
+  --color-danger: #e24b4a;
+  --color-danger-subtle: #2a0a0a;
+  --color-info: #4a9fe0;
+  --color-info-subtle: #0c2a42;
+
+  /* Status bar */
+  --color-statusbar-bg: #111111;
+  --color-statusbar-text: #888888;
+
+  /* Syntax highlighting */
+  --syntax-keyword: #4a9fe0;
+  --syntax-function: #3dbfa0;
+  --syntax-string: #e8a44a;
+  --syntax-number: #c792ea;
+  --syntax-comment: #666666;
+  --syntax-operator: #aaaaaa;
+  --syntax-type: #3dbfa0;
+}

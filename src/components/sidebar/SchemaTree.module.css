@@ -1,0 +1,33 @@
+.columnType {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.notNull {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  opacity: 0.7;
+}
+
+.pk {
+  color: var(--color-warning);
+}
+
+.fk {
+  color: var(--color-accent);
+}
+
+.empty {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-tertiary);
+}

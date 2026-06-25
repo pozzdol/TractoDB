@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    /* Build-time tooling config (vite.config.ts). */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["vite.config.ts", "electron-builder.yml"]
+}

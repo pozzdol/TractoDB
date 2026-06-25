@@ -1,0 +1,27 @@
+.handle {
+  flex: 0 0 var(--divider-size);
+  background-color: transparent;
+  transition: background-color var(--transition-fast);
+  z-index: 1;
+}
+
+.vertical {
+  cursor: col-resize;
+  /* Widen the hit area beyond the visible hairline without taking layout space. */
+  margin: 0 calc(var(--divider-size) / -2);
+  padding: 0 calc(var(--divider-size) / 2);
+  background-clip: content-box;
+}
+
+.horizontal {
+  cursor: row-resize;
+  margin: calc(var(--divider-size) / -2) 0;
+  padding: calc(var(--divider-size) / 2) 0;
+  background-clip: content-box;
+}
+
+.handle:hover,
+.handle:focus-visible,
+.dragging {
+  background-color: var(--color-accent);
+}
