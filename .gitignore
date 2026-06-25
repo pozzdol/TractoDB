@@ -37,6 +37,7 @@ config/*
 # Ignore any auto-generated or binary build artifacts
 build/*
 !build/.gitkeep
+!build/deb-after-install.sh
 
 # ─── Docs (keep folder, ignore generated screenshots) ─────────────────────────
 docs/*

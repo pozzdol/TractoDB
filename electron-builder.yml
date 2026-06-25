@@ -22,6 +22,7 @@ linux:
 deb:
   priority: optional
   compression: xz
+  afterInstall: build/deb-after-install.sh
   depends:
     - libsecret-1-0
     - libnss3
