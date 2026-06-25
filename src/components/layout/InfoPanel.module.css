@@ -41,6 +41,14 @@
   color: var(--color-text-tertiary);
 }
 
+.typeValue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
 .value {
   flex: 1 1 auto;
   min-width: 0;

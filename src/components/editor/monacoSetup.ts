@@ -1,6 +1,8 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { loader } from '@monaco-editor/react'
+import { registerColumnProvider } from './autocomplete/columnProvider'
+import { registerAliasProvider } from './autocomplete/aliasProvider'
 
 // SQL needs only the base editor worker (no language-service workers).
 self.MonacoEnvironment = {
@@ -118,4 +120,8 @@ export function setupMonaco(): void {
       },
     })
   }
+
+  // Smart alias-aware providers (Feature 4).
+  registerColumnProvider()
+  registerAliasProvider()
 }

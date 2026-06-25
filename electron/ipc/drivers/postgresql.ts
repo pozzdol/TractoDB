@@ -167,6 +167,10 @@ export class PostgresDriver implements DatabaseDriver {
   }
 
   async listDatabases(): Promise<DatabaseInfo[]> {
+    // Single-database mode: don't enumerate the server, just the configured db.
+    if (this.config.databaseMode === 'single' && this.config.database) {
+      return [{ name: this.config.database }]
+    }
     try {
       const res = await this.requirePool().query<{ name: string; owner: string; size: string }>(
         `SELECT d.datname AS name,

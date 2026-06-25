@@ -21,6 +21,26 @@
   background-color: var(--status-error);
 }
 
+.lock {
+  color: var(--color-danger);
+  flex: 0 0 auto;
+}
+
+.prodBadge {
+  flex: 0 0 auto;
+  padding: 0 var(--space-1);
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--color-text-inverse);
+  background-color: var(--color-danger);
+  border-radius: var(--radius-sm);
+}
+
+.dotProd {
+  box-shadow: 0 0 0 1.5px var(--color-danger);
+}
+
 .loading {
   height: 24px;
   display: flex;

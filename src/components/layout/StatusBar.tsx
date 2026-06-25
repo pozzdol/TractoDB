@@ -1,4 +1,5 @@
 import { useConnectionStore } from '@/store/connectionStore'
+import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
 import type { ConnectionStatus } from '@/types/connection'
 import styles from './StatusBar.module.css'
 
@@ -20,6 +21,7 @@ export function StatusBar() {
     <footer className={styles.bar}>
       <div className={styles.section}>
         <span className={`${styles.dot} ${STATUS_CLASS[status]}`} aria-hidden="true" />
+        {active ? <DatabaseIcon type={active.config.type} size={12} /> : null}
         <span>{active ? active.config.name : 'Not connected'}</span>
         {database ? (
           <>

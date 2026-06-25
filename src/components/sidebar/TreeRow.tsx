@@ -16,6 +16,8 @@ interface TreeRowProps {
   active?: boolean
   /** Smaller 24px / text-sm row for nested schema items (DESIGN.md). */
   compact?: boolean
+  /** Render the label in danger red (e.g. production connection). */
+  danger?: boolean
   meta?: ReactNode
   title?: string
   onActivate?: () => void
@@ -35,6 +37,7 @@ export function TreeRow({
   loading = false,
   active = false,
   compact = false,
+  danger = false,
   meta,
   title,
   onActivate,
@@ -54,7 +57,12 @@ export function TreeRow({
     }
   }
 
-  const className = [styles.row, compact ? styles.compact : '', active ? styles.active : '']
+  const className = [
+    styles.row,
+    compact ? styles.compact : '',
+    active ? styles.active : '',
+    danger ? styles.danger : '',
+  ]
     .filter(Boolean)
     .join(' ')
 

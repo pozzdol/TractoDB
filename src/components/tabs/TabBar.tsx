@@ -5,7 +5,7 @@ import { useConnectionStore } from '@/store/connectionStore'
 import styles from './TabBar.module.css'
 
 function tabIcon(tab: Tab) {
-  return tab.type === 'table-browser' ? <IconTable size={13} /> : <IconFileCode size={13} />
+  return tab.type === 'table-viewer' ? <IconTable size={13} /> : <IconFileCode size={13} />
 }
 
 export function TabBar() {

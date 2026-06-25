@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { PersistedTab } from '@shared/ipc'
 import { api } from './ipcClient'
 
-export type TabType = 'query-editor' | 'table-browser'
+export type TabType = 'query-editor' | 'table-viewer'
 
 interface BaseTab {
   id: string
@@ -17,13 +17,14 @@ export interface QueryEditorTab extends BaseTab {
   database: string | null
 }
 
-export interface TableBrowserTab extends BaseTab {
-  type: 'table-browser'
+export interface TableViewerTab extends BaseTab {
+  type: 'table-viewer'
   database: string
   table: string
+  schema?: string
 }
 
-export type Tab = QueryEditorTab | TableBrowserTab
+export type Tab = QueryEditorTab | TableViewerTab
 
 function newId(): string {
   return crypto.randomUUID()
@@ -46,18 +47,20 @@ function toPersisted(tab: Tab): PersistedTab {
         connectionId: tab.connectionId,
         database: tab.database,
         table: tab.table,
+        schema: tab.schema,
       }
 }
 
 function fromPersisted(p: PersistedTab): Tab {
-  if (p.type === 'table-browser') {
+  if (p.type === 'table-viewer') {
     return {
       id: p.id,
-      type: 'table-browser',
+      type: 'table-viewer',
       title: p.title,
       connectionId: p.connectionId,
       database: p.database ?? '',
       table: p.table ?? '',
+      schema: p.schema,
     }
   }
   return {
@@ -94,6 +97,7 @@ interface OpenTableOptions {
   connectionId: string
   database: string
   table: string
+  schema?: string
 }
 
 export interface TabStore {
@@ -132,8 +136,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
   openTableTab(options) {
     // Don't open a duplicate — focus the existing tab for this table instead.
     const existing = get().tabs.find(
-      (t): t is TableBrowserTab =>
-        t.type === 'table-browser' &&
+      (t): t is TableViewerTab =>
+        t.type === 'table-viewer' &&
         t.connectionId === options.connectionId &&
         t.database === options.database &&
         t.table === options.table,
@@ -143,13 +147,14 @@ export const useTabStore = create<TabStore>((set, get) => ({
       return existing.id
     }
     const id = newId()
-    const tab: TableBrowserTab = {
+    const tab: TableViewerTab = {
       id,
-      type: 'table-browser',
+      type: 'table-viewer',
       title: options.table,
       connectionId: options.connectionId,
       database: options.database,
       table: options.table,
+      schema: options.schema,
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: id }))
     return id

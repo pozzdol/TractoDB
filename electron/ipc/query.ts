@@ -6,7 +6,12 @@ import { describeError } from './drivers/base'
 export function registerQueryHandlers(): void {
   ipcMain.handle(IPC.QUERY.EXECUTE, async (_e, request: QueryRequest) => {
     try {
-      return ipcSuccess(await connectionManager.runQuery(request.connectionId, request.sql))
+      return ipcSuccess(
+        await connectionManager.runQuery(request.connectionId, request.sql, {
+          offset: request.offset,
+          limit: request.limit,
+        }),
+      )
     } catch (err) {
       return ipcError(describeError(err))
     }

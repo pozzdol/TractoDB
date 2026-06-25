@@ -7,12 +7,20 @@ type SubTab = 'result' | 'messages' | 'history'
 
 interface ResultsPanelProps {
   execution?: QueryExecution
+  onLoadMore?: () => void
 }
 
-export function ResultsPanel({ execution }: ResultsPanelProps) {
+function rowCounter(e: QueryExecution): string {
+  if (e.totalCount === undefined) return `${e.rows.length} rows`
+  return e.hasMore
+    ? `Showing ${e.rows.length} of ${e.totalCount.toLocaleString()} rows`
+    : `All ${e.totalCount.toLocaleString()} rows`
+}
+
+export function ResultsPanel({ execution, onLoadMore }: ResultsPanelProps) {
   const [tab, setTab] = useState<SubTab>('result')
   const history = useQueryStore((s) => s.history)
-  const result = execution?.result
+  const hasRun = execution && execution.status !== 'idle'
 
   const tabs: { id: SubTab; label: string }[] = [
     { id: 'result', label: 'Result' },
@@ -36,8 +44,12 @@ export function ResultsPanel({ execution }: ResultsPanelProps) {
           ))}
         </div>
         <div className={styles.meta}>
-          {result ? <span className={styles.count}>{result.rowCount} rows</span> : null}
-          {result ? <span className={styles.timing}>{result.durationMs} ms</span> : null}
+          {execution && execution.status === 'success' ? (
+            <>
+              <span className={styles.count}>{rowCounter(execution)}</span>
+              <span className={styles.timing}>{execution.durationMs} ms</span>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -47,8 +59,14 @@ export function ResultsPanel({ execution }: ResultsPanelProps) {
             <p className={styles.message}>Running…</p>
           ) : execution?.status === 'error' ? (
             <p className={styles.error}>{execution.error}</p>
-          ) : result ? (
-            <DataGrid result={result} />
+          ) : hasRun ? (
+            <DataGrid
+              columns={execution!.columns}
+              rows={execution!.rows}
+              hasMore={execution!.hasMore}
+              isLoadingMore={execution!.isLoadingMore}
+              onLoadMore={onLoadMore}
+            />
           ) : (
             <p className={styles.message}>Run a query to see results.</p>
           ))}
@@ -57,14 +75,14 @@ export function ResultsPanel({ execution }: ResultsPanelProps) {
           <div className={styles.messages}>
             {execution?.status === 'error' ? (
               <p className={styles.error}>{execution.error}</p>
-            ) : result ? (
+            ) : execution?.status === 'success' ? (
               <>
                 <p className={styles.message}>
-                  {result.columns.length > 0
-                    ? `${result.rowCount} row(s) returned in ${result.durationMs} ms.`
-                    : `${result.rowCount} row(s) affected in ${result.durationMs} ms.`}
+                  {execution.columns.length > 0
+                    ? `${rowCounter(execution)} in ${execution.durationMs} ms.`
+                    : `Statement executed in ${execution.durationMs} ms.`}
                 </p>
-                {result.notice ? <p className={styles.notice}>{result.notice}</p> : null}
+                {execution.notice ? <p className={styles.notice}>{execution.notice}</p> : null}
               </>
             ) : (
               <p className={styles.message}>No messages.</p>

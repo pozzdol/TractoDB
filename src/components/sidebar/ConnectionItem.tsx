@@ -1,7 +1,7 @@
-import { IconDatabase } from '@tabler/icons-react'
+import { IconLock } from '@tabler/icons-react'
 import type { MouseEvent } from 'react'
 import { useConnectionStore } from '@/store/connectionStore'
-import { databaseTypeMeta } from '@/types/connection'
+import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
 import type { ConnectionState, ConnectionStatus } from '@/types/connection'
 import { TreeRow } from './TreeRow'
 import { SchemaTree, type DatabaseContextHandler, type TableContextHandler } from './SchemaTree'
@@ -29,24 +29,29 @@ export function ConnectionItem({
 }: ConnectionItemProps) {
   const toggleConnection = useConnectionStore((s) => s.toggleConnection)
   const { config, status } = connection
-  const meta = databaseTypeMeta(config.type)
   const connected = status === 'connected'
+  const isProd = config.environment === 'production'
 
   return (
     <div role="group">
       <TreeRow
         depth={0}
         label={config.name}
-        icon={<IconDatabase size={14} style={{ color: meta.colorVar }} />}
+        danger={isProd}
+        icon={<DatabaseIcon type={config.type} size={16} />}
         expandable={connected}
         expanded={connection.expanded}
         loading={status === 'connecting'}
         title={status === 'error' ? connection.errorMessage : config.name}
         meta={
-          <span
-            className={`${styles.dot} ${DOT_CLASS[status]}`}
-            aria-label={status}
-          />
+          <>
+            {isProd ? <IconLock size={11} className={styles.lock} /> : null}
+            {isProd ? <span className={styles.prodBadge}>PROD</span> : null}
+            <span
+              className={`${styles.dot} ${DOT_CLASS[status]} ${isProd ? styles.dotProd : ''}`}
+              aria-label={status}
+            />
+          </>
         }
         onActivate={() => void toggleConnection(config.id)}
         onToggle={() => void toggleConnection(config.id)}
@@ -61,6 +66,7 @@ export function ConnectionItem({
         ) : (
           <SchemaTree
             connectionId={config.id}
+            dbType={config.type}
             databases={connection.databases}
             onTableContextMenu={onTableContextMenu}
             onDatabaseContextMenu={onDatabaseContextMenu}

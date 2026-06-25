@@ -4,6 +4,7 @@ import { useTabStore } from '@/store/tabStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { api } from '@/store/ipcClient'
 import { databaseTypeMeta } from '@/types/connection'
+import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
 import type { ColumnInfo } from '@/types/schema'
 import styles from './InfoPanel.module.css'
 
@@ -16,7 +17,7 @@ function useActiveContext() {
     s.connections.find((c) => c.config.id === connectionId),
   )
   const table =
-    activeTab?.type === 'table-browser'
+    activeTab?.type === 'table-viewer'
       ? { database: activeTab.database, table: activeTab.table }
       : null
   return { conn, table }
@@ -84,7 +85,13 @@ export function InfoPanel() {
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Connection</h3>
         <Field label="Name" value={cfg.name} />
-        <Field label="Type" value={meta.label} />
+        <div className={styles.field}>
+          <span className={styles.label}>Type</span>
+          <span className={styles.typeValue}>
+            <DatabaseIcon type={cfg.type} size={16} />
+            {meta.label}
+          </span>
+        </div>
         <Field label={meta.usesFile ? 'File' : 'Host'} value={endpoint} />
         {cfg.database ? <Field label="Database" value={cfg.database} /> : null}
         <Field label="Status" value={conn.status} />

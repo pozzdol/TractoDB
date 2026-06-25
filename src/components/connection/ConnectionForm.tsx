@@ -6,8 +6,15 @@ import { Input } from '@/components/ui/Input'
 import { api } from '@/store/ipcClient'
 import { useUiStore } from '@/store/uiStore'
 import { useConnectionStore } from '@/store/connectionStore'
-import { DATABASE_TYPES, databaseTypeMeta } from '@/types/connection'
-import type { ConnectionWithPassword, DatabaseType } from '@/types/connection'
+import { databaseTypeMeta } from '@/types/connection'
+import { DatabaseIcon, DB_LABELS } from '@/components/ui/DatabaseIcon'
+import { DatabaseTypeSelect } from './DatabaseTypeSelect'
+import type {
+  ConnectionEnvironment,
+  ConnectionWithPassword,
+  DatabaseMode,
+  DatabaseType,
+} from '@/types/connection'
 import { SSHForm } from './SSHForm'
 import styles from './ConnectionForm.module.css'
 
@@ -21,6 +28,8 @@ interface FormState {
   password: string
   filePath: string
   ssl: boolean
+  databaseMode: DatabaseMode
+  environment: ConnectionEnvironment
 }
 
 type TestState =
@@ -44,6 +53,8 @@ function initialForm(editId: string | null): FormState {
     password: '', // never pre-filled — left blank keeps the stored password on edit
     filePath: existing?.filePath ?? '',
     ssl: existing?.ssl ?? false,
+    databaseMode: existing?.databaseMode ?? 'single', // default: specific db (less noise)
+    environment: existing?.environment ?? 'development',
   }
 }
 
@@ -59,6 +70,8 @@ export function ConnectionForm() {
   const [saving, setSaving] = useState(false)
 
   const meta = databaseTypeMeta(form.type)
+  // Only pg/mysql can list multiple databases; SQLite/Redis are always single.
+  const supportsDbToggle = form.type === 'postgresql' || form.type === 'mysql'
   const set = <K extends keyof FormState>(key: K, value: FormState[K]): void => {
     setForm((f) => ({ ...f, [key]: value }))
     setTest({ status: 'idle' })
@@ -93,15 +106,23 @@ export function ConnectionForm() {
       type: form.type,
       host: meta.usesHostPort ? form.host.trim() : undefined,
       port: meta.usesHostPort ? Number(form.port) : undefined,
-      database: meta.usesDatabase ? form.database.trim() || undefined : undefined,
+      database:
+        meta.usesDatabase && (!supportsDbToggle || form.databaseMode === 'single')
+          ? form.database.trim() || undefined
+          : undefined,
       username: meta.usesUsername ? form.username.trim() || undefined : undefined,
       filePath: meta.usesFile ? form.filePath.trim() : undefined,
       ssl: meta.usesHostPort ? form.ssl : undefined,
+      databaseMode: supportsDbToggle ? form.databaseMode : 'single',
+      environment: form.environment,
       password: form.password || undefined,
       createdAt: existing?.createdAt ?? '',
       updatedAt: '',
     }
   }
+
+  // Show the database name field for redis (always), or pg/mysql in single mode.
+  const showDatabaseInput = meta.usesDatabase && (!supportsDbToggle || form.databaseMode === 'single')
 
   async function handleTest(): Promise<void> {
     const e = validate()
@@ -162,6 +183,11 @@ export function ConnectionForm() {
       }
     >
       <div className={styles.form}>
+        <div className={styles.headerRow}>
+          <DatabaseIcon type={form.type} size={24} />
+          <span className={styles.headerLabel}>{DB_LABELS[form.type]}</span>
+        </div>
+
         <Input
           label="Name"
           value={form.name}
@@ -172,18 +198,27 @@ export function ConnectionForm() {
 
         <label className={styles.field}>
           <span className={styles.label}>Type</span>
+          <DatabaseTypeSelect value={form.type} onChange={changeType} />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.label}>Environment</span>
           <select
             className={styles.select}
-            value={form.type}
-            onChange={(e) => changeType(e.target.value as DatabaseType)}
+            value={form.environment}
+            onChange={(e) => set('environment', e.target.value as ConnectionEnvironment)}
           >
-            {DATABASE_TYPES.map((t) => (
-              <option key={t.type} value={t.type}>
-                {t.label}
-              </option>
-            ))}
+            <option value="development">Development</option>
+            <option value="production">Production</option>
           </select>
         </label>
+
+        {form.environment === 'production' ? (
+          <div className={styles.prodWarning}>
+            Production connections are read-only. INSERT, UPDATE, DELETE, DROP, and DDL
+            operations will be blocked.
+          </div>
+        ) : null}
 
         {meta.usesFile ? (
           <Input
@@ -223,7 +258,33 @@ export function ConnectionForm() {
           </div>
         ) : null}
 
-        {meta.usesDatabase ? (
+        {supportsDbToggle ? (
+          <div className={styles.field}>
+            <span className={styles.label}>Databases</span>
+            <div className={styles.radioRow}>
+              <label className={styles.radio}>
+                <input
+                  type="radio"
+                  name="databaseMode"
+                  checked={form.databaseMode === 'single'}
+                  onChange={() => set('databaseMode', 'single')}
+                />
+                <span>Specific database</span>
+              </label>
+              <label className={styles.radio}>
+                <input
+                  type="radio"
+                  name="databaseMode"
+                  checked={form.databaseMode === 'all'}
+                  onChange={() => set('databaseMode', 'all')}
+                />
+                <span>All databases</span>
+              </label>
+            </div>
+          </div>
+        ) : null}
+
+        {showDatabaseInput ? (
           <Input
             label={form.type === 'redis' ? 'Database index' : 'Database'}
             value={form.database}

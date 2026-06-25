@@ -1,0 +1,57 @@
+.view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.closed {
+  padding: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.prodBanner {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-6);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-inverse);
+  background-color: var(--color-danger);
+}
+
+.subTabs {
+  flex: 0 0 var(--tab-height);
+  display: flex;
+  align-items: stretch;
+  height: var(--tab-height);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+}
+
+.subTab {
+  padding: 0 var(--space-6);
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  border-right: var(--border);
+  border-bottom: 2px solid transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.subTab:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.active {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border-bottom-color: var(--color-accent);
+}
+
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}

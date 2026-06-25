@@ -4,8 +4,10 @@
 export type {
   ActiveConnection,
   ConnectionConfig,
+  ConnectionEnvironment,
   ConnectionStatus,
   ConnectionWithPassword,
+  DatabaseMode,
   DatabaseType,
 } from '@shared/ipc'
 

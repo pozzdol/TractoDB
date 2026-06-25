@@ -1,0 +1,128 @@
+.wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.error {
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.tableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border-strong);
+}
+
+.table td {
+  padding: var(--space-1) var(--space-4);
+  border-bottom: var(--border);
+  color: var(--color-text-primary);
+}
+
+.center {
+  text-align: center;
+}
+
+.comment {
+  color: var(--color-text-tertiary);
+}
+
+.input {
+  width: 100%;
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.input:disabled {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.modified {
+  background-color: var(--color-warning-subtle);
+}
+
+.added {
+  background-color: var(--color-success-subtle);
+}
+
+.droppedRow {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.drop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+}
+
+.drop:hover:not(:disabled) {
+  color: var(--color-danger);
+  background-color: var(--color-danger-subtle);
+}
+
+.drop:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.confirmText {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.actionList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}

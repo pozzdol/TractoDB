@@ -168,6 +168,9 @@ export class MySqlDriver implements DatabaseDriver {
   }
 
   async listDatabases(): Promise<DatabaseInfo[]> {
+    if (this.config.databaseMode === 'single' && this.config.database) {
+      return [{ name: this.config.database }]
+    }
     try {
       const [rows] = await this.requirePool().query('SHOW DATABASES')
       return (rows as Array<Record<string, string>>)

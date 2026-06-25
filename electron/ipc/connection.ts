@@ -23,30 +23,33 @@ interface ManagedConnection {
   databaseVersion?: string
 }
 
-/** SQL engines that support an appended LIMIT clause. */
+/** SQL engines that support LIMIT/OFFSET pagination. */
 const SQL_ENGINES: ReadonlySet<DatabaseType> = new Set<DatabaseType>([
   'postgresql',
   'mysql',
   'sqlite',
 ])
 
-/**
- * Enforce a row cap on bare SELECTs (TASKS.md Phase 2.5): if a SELECT has no
- * LIMIT, append one and return a notice for the Messages tab.
- */
-function applyMaxRows(
-  sql: string,
-  type: DatabaseType,
-  maxRows: number,
-): { sql: string; notice?: string } {
-  if (!SQL_ENGINES.has(type) || maxRows <= 0) return { sql }
-  const trimmed = sql.trim().replace(/;\s*$/, '')
-  const isSelect = /^\s*select\b/i.test(trimmed)
-  const hasLimit = /\blimit\b/i.test(trimmed)
-  if (!isSelect || hasLimit) return { sql }
-  return {
-    sql: `${trimmed} LIMIT ${maxRows}`,
-    notice: `Results limited to ${maxRows} rows. Add an explicit LIMIT to override.`,
+export interface QueryOptions {
+  offset?: number
+  limit?: number
+}
+
+const WRITE_STATEMENTS = [
+  'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'CREATE', 'REPLACE',
+]
+const PROD_READONLY =
+  'Blocked: this is a production connection. Only SELECT and read-only statements are allowed.'
+
+/** Throw if `sql` contains any write statement (production read-only guard). */
+function assertReadOnlySql(sql: string): void {
+  for (const statement of sql.split(';')) {
+    const first = statement
+      .replace(/^\s*(--[^\n]*\n)*/g, '') // skip leading line comments
+      .trim()
+      .split(/\s+/)[0]
+      ?.toUpperCase()
+    if (first && WRITE_STATEMENTS.includes(first)) throw new Error(PROD_READONLY)
   }
 }
 
@@ -105,26 +108,71 @@ class ConnectionManager {
     return managed.driver
   }
 
-  async runQuery(connectionId: string, sql: string): Promise<QueryResult> {
+  getConfig(id: string): ConnectionConfig {
+    const managed = this.active.get(id)
+    if (!managed) throw new Error('Connection is not open.')
+    return managed.config
+  }
+
+  isProduction(id: string): boolean {
+    return this.active.get(id)?.config.environment === 'production'
+  }
+
+  async runQuery(
+    connectionId: string,
+    sql: string,
+    options: QueryOptions = {},
+  ): Promise<QueryResult> {
     const managed = this.active.get(connectionId)
     if (!managed) throw new Error('Connection is not open.')
 
+    if (managed.config.environment === 'production') assertReadOnlySql(sql)
+
     const prefs = await getPreferences()
-    const { sql: finalSql, notice } = applyMaxRows(sql, managed.config.type, prefs.maxRows)
     const timeoutMs = Math.max(1, prefs.queryTimeout) * 1000
 
+    // Pagination: append LIMIT/OFFSET to a bare SELECT when a page size is given.
+    const { offset = 0, limit } = options
+    const base = sql.trim().replace(/;\s*$/, '')
+    const isSelect = /^\s*(select|with)\b/i.test(base)
+    const hasLimit = /\blimit\b/i.test(base)
+    const canPaginate =
+      limit !== undefined && SQL_ENGINES.has(managed.config.type) && isSelect && !hasLimit
+    const execSql = canPaginate ? `${base} LIMIT ${limit} OFFSET ${offset}` : sql
+
+    const result = await this.execWithRetry(connectionId, execSql, timeoutMs)
+
+    if (!canPaginate) return result
+
+    // Total row count (best-effort) so the UI can show "N of M" + hasMore.
+    let totalCount: number | undefined
     try {
-      const result = await this.execWithTimeout(managed, finalSql, timeoutMs)
-      return notice ? { ...result, notice } : result
+      const countRes = await managed.driver.query(`SELECT COUNT(*) AS c FROM (${base}) AS _dbs_c`)
+      const c = Number(countRes.rows[0]?.c)
+      if (Number.isFinite(c)) totalCount = c
+    } catch {
+      totalCount = undefined
+    }
+    const hasMore =
+      totalCount !== undefined ? offset + result.rowCount < totalCount : result.rowCount === limit
+    return { ...result, totalCount, hasMore }
+  }
+
+  private async execWithRetry(
+    connectionId: string,
+    sql: string,
+    timeoutMs: number,
+  ): Promise<QueryResult> {
+    const managed = this.active.get(connectionId)
+    if (!managed) throw new Error('Connection is not open.')
+    try {
+      return await this.execWithTimeout(managed, sql, timeoutMs)
     } catch (err) {
       // One silent reconnect-and-retry on a dropped connection.
       if (isConnectionDropped(err)) {
         await this.reconnect(connectionId)
         const retried = this.active.get(connectionId)
-        if (retried) {
-          const result = await this.execWithTimeout(retried, finalSql, timeoutMs)
-          return notice ? { ...result, notice } : result
-        }
+        if (retried) return this.execWithTimeout(retried, sql, timeoutMs)
       }
       throw err
     }

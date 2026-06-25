@@ -21,6 +21,14 @@ export const IPC = {
     LIST_DATABASES: 'schema:listDatabases',
     LIST_TABLES: 'schema:listTables',
     LIST_COLUMNS: 'schema:listColumns',
+    GET_TABLE_DDL: 'schema:getTableDDL',
+    GET_TABLE_INFO: 'schema:getTableInfo',
+    GET_INDEXES: 'schema:getIndexes',
+    GET_FOREIGN_KEYS: 'schema:getForeignKeys',
+  },
+  TABLE: {
+    UPDATE_CELL: 'table:updateCell',
+    ALTER_COLUMN: 'table:alterColumn',
   },
   CONFIG: {
     SAVE_CONNECTION: 'config:saveConnection',
@@ -59,6 +67,11 @@ export type SecretsBackend = 'keychain' | 'encrypted-file'
 
 export type DatabaseType = 'postgresql' | 'mysql' | 'sqlite' | 'redis'
 
+/** Which databases to load: all on the server, or just the configured one. */
+export type DatabaseMode = 'all' | 'single'
+/** Connection environment — production is enforced read-only. */
+export type ConnectionEnvironment = 'production' | 'development'
+
 // ─── Connection Config ────────────────────────────────────────────────────────
 
 export interface ConnectionConfig {
@@ -76,6 +89,10 @@ export interface ConnectionConfig {
   filePath?: string
   // TLS
   ssl?: boolean
+  // 'single' loads only `database`; 'all' lists every database (pg/mysql).
+  databaseMode?: DatabaseMode
+  // Production connections are read-only (writes blocked in query.ts).
+  environment?: ConnectionEnvironment
   // Metadata
   createdAt: string
   updatedAt: string
@@ -106,6 +123,10 @@ export interface QueryRequest {
   connectionId: string
   sql: string
   database?: string
+  /** Pagination: 0-based row offset. */
+  offset?: number
+  /** Pagination: page size. Omit to run the query unbounded. */
+  limit?: number
 }
 
 export interface QueryColumn {
@@ -117,10 +138,15 @@ export interface QueryColumn {
 export interface QueryResult {
   columns: QueryColumn[]
   rows: Record<string, unknown>[]
+  /** Rows returned in this page. */
   rowCount: number
+  /** Total matching rows (when paginating a SELECT); undefined if unknown. */
+  totalCount?: number
+  /** True when more pages remain. */
+  hasMore?: boolean
   durationMs: number
   sql: string
-  /** Non-fatal notice surfaced in the Messages tab (e.g. result row cap). */
+  /** Non-fatal notice surfaced in the Messages tab. */
   notice?: string
 }
 
@@ -165,11 +191,60 @@ export interface ColumnInfo {
   isForeignKey: boolean
   foreignTable?: string
   foreignColumn?: string
+  comment?: string
+}
+
+// ─── Table metadata (Table Viewer) ─────────────────────────────────────────────
+
+export interface IndexInfo {
+  name: string
+  columns: string[]
+  unique: boolean
+  type?: string
+}
+
+export interface ForeignKeyInfo {
+  name?: string
+  column: string
+  referencedTable: string
+  referencedColumn: string
+}
+
+export interface TableDetails {
+  name: string
+  schema?: string
+  owner?: string
+  rowCount?: number
+  sizePretty?: string
+  comment?: string
+}
+
+export interface TableRef {
+  connectionId: string
+  database: string
+  schema?: string
+  table: string
+}
+
+export interface UpdateCellRequest extends TableRef {
+  pkColumn: string
+  pkValue: unknown
+  column: string
+  value: unknown
+}
+
+export type AlterColumnAction =
+  | { kind: 'add'; column: string; dataType: string; nullable?: boolean; defaultValue?: string | null }
+  | { kind: 'drop'; column: string }
+  | { kind: 'modify'; column: string; dataType?: string; nullable?: boolean; defaultValue?: string | null }
+
+export interface AlterColumnRequest extends TableRef {
+  actions: AlterColumnAction[]
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-export type TabType = 'query-editor' | 'table-browser'
+export type TabType = 'query-editor' | 'table-viewer'
 
 /** Serializable tab — persisted in layout.json and restored on reload. */
 export interface PersistedTab {
@@ -180,6 +255,7 @@ export interface PersistedTab {
   sql?: string
   database?: string | null
   table?: string
+  schema?: string
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -348,6 +424,8 @@ export interface DbStudioApi {
       connectionId: string,
       sql: string,
       database?: string,
+      offset?: number,
+      limit?: number,
     ): Promise<IpcResponse<QueryResult>>
     cancel(connectionId: string): Promise<IpcResponse<void>>
   }
@@ -359,6 +437,14 @@ export interface DbStudioApi {
       database: string,
       table: string,
     ): Promise<IpcResponse<ColumnInfo[]>>
+    getTableDDL(ref: TableRef): Promise<IpcResponse<string>>
+    getTableInfo(ref: TableRef): Promise<IpcResponse<TableDetails>>
+    getIndexes(ref: TableRef): Promise<IpcResponse<IndexInfo[]>>
+    getForeignKeys(ref: TableRef): Promise<IpcResponse<ForeignKeyInfo[]>>
+  }
+  table: {
+    updateCell(request: UpdateCellRequest): Promise<IpcResponse<void>>
+    alterColumn(request: AlterColumnRequest): Promise<IpcResponse<string>>
   }
   config: {
     saveConnection(connection: ConnectionWithPassword): Promise<IpcResponse<ConnectionConfig>>

@@ -32,6 +32,10 @@
   color: var(--color-accent);
 }
 
+.danger .label {
+  color: var(--color-danger);
+}
+
 .active .icon {
   color: var(--color-accent);
 }

@@ -1,7 +1,6 @@
 import {
   IconCode,
   IconColumns,
-  IconDatabase,
   IconKey,
   IconLayoutList,
   IconLink,
@@ -10,6 +9,8 @@ import {
 import type { MouseEvent, ReactNode } from 'react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
+import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
+import type { DatabaseType } from '@/types/connection'
 import type { ColumnInfo, DatabaseNode, TableNode, TableType } from '@/types/schema'
 import { TreeRow } from './TreeRow'
 import styles from './SchemaTree.module.css'
@@ -88,7 +89,9 @@ function TableRow({
         label={table.name}
         icon={tableIcon(table.type)}
         meta={table.rowCount !== undefined ? <span>{table.rowCount}</span> : undefined}
-        onActivate={() => openTableTab({ connectionId, database, table: table.name })}
+        onActivate={() =>
+          openTableTab({ connectionId, database, table: table.name, schema: table.schema })
+        }
         onToggle={() => void toggleTable(connectionId, database, table.name)}
         onContextMenu={(e) => onTableContextMenu(e, database, table.name)}
       />
@@ -103,11 +106,13 @@ function TableRow({
 
 function DatabaseRow({
   connectionId,
+  dbType,
   database,
   onTableContextMenu,
   onDatabaseContextMenu,
 }: {
   connectionId: string
+  dbType: DatabaseType
   database: DatabaseNode
   onTableContextMenu: TableContextHandler
   onDatabaseContextMenu?: DatabaseContextHandler
@@ -123,7 +128,7 @@ function DatabaseRow({
         expanded={database.expanded}
         loading={database.expanded && database.loadingTables}
         label={database.name}
-        icon={<IconDatabase size={12} />}
+        icon={<DatabaseIcon type={dbType} size={14} />}
         meta={database.size ? <span>{database.size}</span> : undefined}
         onActivate={() => void toggleDatabase(connectionId, database.name)}
         onToggle={() => void toggleDatabase(connectionId, database.name)}
@@ -158,11 +163,13 @@ function EmptyRow({ depth, label }: { depth: number; label: string }) {
 
 export function SchemaTree({
   connectionId,
+  dbType,
   databases,
   onTableContextMenu,
   onDatabaseContextMenu,
 }: {
   connectionId: string
+  dbType: DatabaseType
   databases: DatabaseNode[]
   onTableContextMenu: TableContextHandler
   onDatabaseContextMenu?: DatabaseContextHandler
@@ -173,6 +180,7 @@ export function SchemaTree({
         <DatabaseRow
           key={db.name}
           connectionId={connectionId}
+          dbType={dbType}
           database={db}
           onTableContextMenu={onTableContextMenu}
           onDatabaseContextMenu={onDatabaseContextMenu}

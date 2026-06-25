@@ -10,6 +10,7 @@ import { ConnectionTree } from '@/components/sidebar/ConnectionTree'
 import { TabBar } from '@/components/tabs/TabBar'
 import { QueryView } from '@/components/editor/QueryView'
 import { ResultsPanel } from '@/components/editor/ResultsPanel'
+import { TableViewer } from '@/components/tableviewer/TableViewer'
 import { ConnectionForm } from '@/components/connection/ConnectionForm'
 import { BackupWizard } from '@/components/backup/BackupWizard'
 import { RestoreWizard } from '@/components/backup/RestoreWizard'
@@ -155,19 +156,26 @@ export default function App() {
                 No tab open — press Ctrl+T for a new query, or click a table.
               </span>
             </div>
-          ) : activeTab.type === 'query-editor' ? (
-            <QueryView key={activeTab.id} tab={activeTab} />
+          ) : activeTab.type === 'table-viewer' ? (
+            <TableViewer key={activeTab.id} tab={activeTab} />
           ) : (
-            <div className={styles.editor}>
-              <span className={styles.placeholder}>
-                Table browser for “{activeTab.table}” — Phase 9.
-              </span>
-            </div>
+            <>
+              <QueryView key={activeTab.id} tab={activeTab} />
+              <ResizeHandle
+                axis="y"
+                handleProps={results.handleProps}
+                dragging={results.dragging}
+              />
+              <div className={styles.results} style={{ height: results.size }}>
+                <ResultsPanel
+                  execution={activeExecution}
+                  onLoadMore={() => {
+                    if (activeTab) void useQueryStore.getState().loadMore(activeTab.id)
+                  }}
+                />
+              </div>
+            </>
           )}
-          <ResizeHandle axis="y" handleProps={results.handleProps} dragging={results.dragging} />
-          <div className={styles.results} style={{ height: results.size }}>
-            <ResultsPanel execution={activeExecution} />
-          </div>
         </main>
 
         {!layout.rightPanelCollapsed && (

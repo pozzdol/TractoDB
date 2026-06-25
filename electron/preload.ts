@@ -15,8 +15,8 @@ const api: DbStudioApi = {
     list: () => ipcRenderer.invoke(IPC.CONNECTION.LIST),
   },
   query: {
-    execute: (connectionId, sql, database) =>
-      ipcRenderer.invoke(IPC.QUERY.EXECUTE, { connectionId, sql, database }),
+    execute: (connectionId, sql, database, offset, limit) =>
+      ipcRenderer.invoke(IPC.QUERY.EXECUTE, { connectionId, sql, database, offset, limit }),
     cancel: (connectionId) => ipcRenderer.invoke(IPC.QUERY.CANCEL, connectionId),
   },
   schema: {
@@ -26,6 +26,14 @@ const api: DbStudioApi = {
       ipcRenderer.invoke(IPC.SCHEMA.LIST_TABLES, connectionId, database),
     listColumns: (connectionId, database, table) =>
       ipcRenderer.invoke(IPC.SCHEMA.LIST_COLUMNS, connectionId, database, table),
+    getTableDDL: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_TABLE_DDL, ref),
+    getTableInfo: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_TABLE_INFO, ref),
+    getIndexes: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_INDEXES, ref),
+    getForeignKeys: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_FOREIGN_KEYS, ref),
+  },
+  table: {
+    updateCell: (request) => ipcRenderer.invoke(IPC.TABLE.UPDATE_CELL, request),
+    alterColumn: (request) => ipcRenderer.invoke(IPC.TABLE.ALTER_COLUMN, request),
   },
   config: {
     saveConnection: (connection) =>

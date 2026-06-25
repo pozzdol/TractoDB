@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { DARK_THEME, LIGHT_THEME, setCompletionSource, setupMonaco } from './monacoSetup'
+import { setSchemaContext, type ColumnMeta } from './autocomplete/schemaCache'
 import styles from './QueryEditor.module.css'
 
 // Configure the bundled monaco + themes before the editor mounts (offline; the
@@ -14,6 +15,10 @@ interface QueryEditorProps {
   isDark: boolean
   tables: string[]
   columns: string[]
+  connectionId: string | null
+  database: string | null
+  tableColumns: Map<string, ColumnMeta[]>
+  tableNames: string[]
   onChange: (value: string) => void
   onRun: () => void
   onRunSelection: (selection: string) => void
@@ -32,6 +37,7 @@ const OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   smoothScrolling: true,
   automaticLayout: true,
   padding: { top: 12, bottom: 12 },
+  inlineSuggest: { enabled: true },
 }
 
 export function QueryEditor({
@@ -40,6 +46,10 @@ export function QueryEditor({
   isDark,
   tables,
   columns,
+  connectionId,
+  database,
+  tableColumns,
+  tableNames,
   onChange,
   onRun,
   onRunSelection,
@@ -50,13 +60,17 @@ export function QueryEditor({
   onRunRef.current = onRun
   onRunSelectionRef.current = onRunSelection
 
-  // Refresh the shared autocomplete source while this editor is focused.
-  useEffect(() => {
+  // Refresh the shared autocomplete sources while this editor is focused.
+  function applySchema(): void {
     setCompletionSource({ tables, columns })
-  }, [tables, columns])
+    setSchemaContext({ connectionId, database, tableColumns, tableNames })
+  }
+  useEffect(() => {
+    applySchema()
+  }, [tables, columns, connectionId, database, tableColumns, tableNames])
 
   const handleMount: OnMount = (editorInstance, monacoInstance) => {
-    editorInstance.onDidFocusEditorText(() => setCompletionSource({ tables, columns }))
+    editorInstance.onDidFocusEditorText(applySchema)
 
     editorInstance.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {
       onRunRef.current()

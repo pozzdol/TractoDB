@@ -77,3 +77,33 @@ tbody tr:hover {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
+
+.editInput {
+  width: 100%;
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-focus);
+  border-radius: var(--radius-sm);
+}
+
+.sentinel {
+  height: 1px;
+}
+
+.skel {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-active);
+  animation: skel-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
