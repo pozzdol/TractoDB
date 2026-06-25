@@ -2,9 +2,9 @@
   "name": "dbstudio",
   "version": "0.1.0",
   "description": "Modern minimalist desktop database manager",
-  "author": "Fikri <fkriachmd@gmail.com>",
-  "homepage": "https://github.com/fikri/dbstudio",
-  "repository": "https://github.com/fikri/dbstudio",
+  "author": "Pozzdol <fkriachmd@gmail.com>",
+  "homepage": "https://github.com/pozzdol/TractoDB",
+  "repository": "https://github.com/pozzdol/TractoDB",
   "main": "dist-electron/main.js",
   "private": true,
   "scripts": {
