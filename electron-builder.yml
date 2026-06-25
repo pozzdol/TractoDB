@@ -28,7 +28,7 @@ deb:
     - libgtk-3-0
 
 appImage:
-  license: MIT
+  license: LICENSE
 
 nsis:
   oneClick: false
