@@ -41,6 +41,7 @@ build/*
 # ─── Docs (keep folder, ignore generated screenshots) ─────────────────────────
 docs/*
 !docs/.gitkeep
+!docs/screenshot.png
 
 # ─── Environment ──────────────────────────────────────────────────────────────
 .env
