@@ -96,7 +96,10 @@ export function DataGrid({
   const [viewport, setViewport] = useState(320)
   const [sort, setSort] = useState<SortState | null>(null)
   const [hoveredRow, setHoveredRow] = useState<number | null>(null)
-  const [selectedRow, setSelectedRow] = useState<number | null>(null)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [lastClickedRow, setLastClickedRow] = useState<number | null>(null)
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set()) // "rowIndex:colKey"
+  const [lastClickedCell, setLastClickedCell] = useState<string | null>(null)
   const [selectedCol, setSelectedCol] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ index: number; column: string } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -104,21 +107,80 @@ export function DataGrid({
 
   const ROW_NUM_WIDTH = 40 // fixed row-number column, not resizable/reorderable
 
-  // Row OR column selection — never both. Clicking a row number deselects any column.
-  function selectRow(index: number): void {
+  // ── Row selection: plain / Ctrl(toggle) / Shift(range, merge) ───────────────
+  function onRowNumClick(e: MouseEvent, index: number): void {
     setSelectedCol(null)
-    setSelectedRow((prev) => (prev === index ? null : index))
+    if (e.shiftKey && lastClickedRow !== null) {
+      const lo = Math.min(lastClickedRow, index)
+      const hi = Math.max(lastClickedRow, index)
+      setSelectedRows((prev) => {
+        const next = new Set(prev)
+        for (let i = lo; i <= hi; i++) next.add(i)
+        return next
+      })
+      // Shift+click does not move the anchor.
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelectedRows((prev) => {
+        const next = new Set(prev)
+        if (next.has(index)) next.delete(index)
+        else next.add(index)
+        return next
+      })
+      setLastClickedRow(index)
+    } else {
+      setSelectedRows(new Set([index]))
+      setLastClickedRow(index)
+    }
   }
+
   function selectCol(key: string): void {
-    setSelectedRow(null)
     setSelectedCol((prev) => (prev === key ? null : key))
+  }
+
+  // ── Cell selection: independent of row selection ────────────────────────────
+  const colIndex = (key: string): number => displayColumns.findIndex((c) => c.col.name === key)
+  function onCellClick(e: MouseEvent, index: number, colKey: string): void {
+    const key = `${index}:${colKey}`
+    if (e.shiftKey && lastClickedCell) {
+      const [lr, lk] = lastClickedCell.split(':')
+      const r0 = Number(lr)
+      const c0 = colIndex(lk ?? '')
+      const c1 = colIndex(colKey)
+      if (c0 < 0 || c1 < 0) return
+      const [rLo, rHi] = [Math.min(r0, index), Math.max(r0, index)]
+      const [cLo, cHi] = [Math.min(c0, c1), Math.max(c0, c1)]
+      setSelectedCells(() => {
+        const next = new Set<string>()
+        for (let r = rLo; r <= rHi; r++)
+          for (let c = cLo; c <= cHi; c++) next.add(`${r}:${displayColumns[c]?.col.name}`)
+        return next
+      })
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelectedCells((prev) => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        return next
+      })
+      setLastClickedCell(key)
+    } else {
+      setSelectedCells(new Set([key]))
+      setLastClickedCell(key)
+    }
   }
 
   // Row background priority: selected > hover > zebra stripe.
   function rowBackground(index: number): string {
-    if (selectedRow === index) return 'var(--grid-row-selected)'
+    if (selectedRows.has(index)) return 'var(--grid-row-selected)'
     if (hoveredRow === index) return 'var(--grid-row-hover)'
     return index % 2 === 1 ? 'var(--grid-row-even)' : 'var(--grid-row-odd)'
+  }
+
+  function onGridKeyDown(e: KeyboardEvent): void {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      e.preventDefault()
+      setSelectedRows(new Set(sortedRows.map((_, i) => i)))
+    }
   }
 
   const columnNames = useMemo(() => columns.map((c) => c.name), [columns])
@@ -339,6 +401,8 @@ export function DataGrid({
       <div
         className={styles.scroll}
         ref={containerRef}
+        tabIndex={0}
+        onKeyDown={onGridKeyDown}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       >
         <table className={styles.table} style={{ width: tableWidth }}>
@@ -394,7 +458,7 @@ export function DataGrid({
             {start > 0 ? <tr style={{ height: start * rowHeight }} aria-hidden="true" /> : null}
             {visible.map((row, i) => {
               const index = start + i
-              const rowSelected = selectedRow === index
+              const rowSelected = selectedRows.has(index)
               return (
                 <tr
                   key={index}
@@ -404,7 +468,7 @@ export function DataGrid({
                 >
                   <td
                     className={`${styles.rowNum} ${rowSelected ? styles.rowNumActive : ''}`}
-                    onClick={() => selectRow(index)}
+                    onClick={(e) => onRowNumClick(e, index)}
                   >
                     {index + 1}
                   </td>
@@ -412,13 +476,22 @@ export function DataGrid({
                     const value = row[col.name]
                     const isNull = value === null || value === undefined
                     const isEditing = editing?.index === index && editing.column === col.name
+                    const cellSelected = selectedCells.has(`${index}:${col.name}`)
+                    const cellStyle = cellSelected
+                      ? {
+                          background: 'var(--grid-row-selected)',
+                          outline: '2px solid var(--color-accent)',
+                          outlineOffset: '-2px',
+                        }
+                      : selectedCol === col.name
+                        ? { background: 'var(--grid-col-highlight)' }
+                        : undefined
                     return (
                       <td
                         key={col.name}
                         className={`${styles.td} ${isNull && !isEditing ? styles.null : ''}`}
-                        style={
-                          selectedCol === col.name ? { background: 'var(--grid-col-highlight)' } : undefined
-                        }
+                        style={cellStyle}
+                        onClick={(e) => onCellClick(e, index, col.name)}
                         onContextMenu={(e) => cellMenu(e, row, value)}
                         onDoubleClick={() => {
                           if (editable) setEditing({ index, column: col.name })
