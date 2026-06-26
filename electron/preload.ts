@@ -47,6 +47,13 @@ const api: DbStudioApi = {
     loadPreferences: () => ipcRenderer.invoke(IPC.CONFIG.LOAD_PREFERENCES),
     secretsBackend: () => ipcRenderer.invoke(IPC.CONFIG.SECRETS_BACKEND),
   },
+  folder: {
+    create: (name, color, parentId) => ipcRenderer.invoke(IPC.FOLDER.CREATE, name, color, parentId),
+    update: (id, patch) => ipcRenderer.invoke(IPC.FOLDER.UPDATE, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC.FOLDER.DELETE, id),
+    list: () => ipcRenderer.invoke(IPC.FOLDER.LIST),
+    reorder: (items) => ipcRenderer.invoke(IPC.FOLDER.REORDER, items),
+  },
   backup: {
     startBackup: (config) => ipcRenderer.invoke(IPC.BACKUP.START_BACKUP, config),
     startRestore: (config) => ipcRenderer.invoke(IPC.BACKUP.START_RESTORE, config),

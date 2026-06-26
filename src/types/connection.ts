@@ -5,10 +5,15 @@ export type {
   ActiveConnection,
   ConnectionConfig,
   ConnectionEnvironment,
+  ConnectionFolder,
   ConnectionStatus,
   ConnectionWithPassword,
   DatabaseMode,
   DatabaseType,
+  FolderColor,
+  FolderDeleteResult,
+  FolderPatch,
+  ReorderItem,
 } from '@shared/ipc'
 
 import type { ConnectionConfig, ConnectionStatus, DatabaseType } from '@shared/ipc'

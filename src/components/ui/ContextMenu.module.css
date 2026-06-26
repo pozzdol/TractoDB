@@ -69,3 +69,27 @@
   margin: var(--space-2) var(--space-2);
   background-color: var(--color-border-default);
 }
+
+.itemWrap {
+  position: relative;
+}
+
+.subChevron {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.submenu {
+  position: absolute;
+  top: -2px;
+  left: calc(100% + 2px);
+  z-index: 1001;
+  min-width: 180px;
+  padding: var(--space-2);
+  background-color: var(--color-bg-primary);
+  border: var(--border-strong);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}

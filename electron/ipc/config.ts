@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import {
@@ -12,10 +13,15 @@ import {
 } from '../../shared/ipc'
 import type {
   ConnectionConfig,
+  ConnectionFolder,
   ConnectionWithPassword,
+  FolderColor,
+  FolderDeleteResult,
+  FolderPatch,
   IpcResponse,
   LayoutConfig,
   NativeClientConfig,
+  ReorderItem,
   SecretsBackend,
   UserPreferences,
 } from '../../shared/ipc'
@@ -35,6 +41,7 @@ const OLD_DIR = path.join(os.homedir(), '.dbstudio') // pre-rename; migration so
 const CONNECTIONS_FILE = path.join(DIR, 'connections.json')
 const LAYOUT_FILE = path.join(DIR, 'layout.json')
 const PREFERENCES_FILE = path.join(DIR, 'preferences.json')
+const FOLDERS_FILE = path.join(DIR, 'folders.json')
 
 async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
@@ -160,6 +167,106 @@ async function loadPreferences(): Promise<UserPreferences> {
   }
 }
 
+// ─── Connection folders ─────────────────────────────────────────────────────────
+
+async function loadFolders(): Promise<ConnectionFolder[]> {
+  const data = await readJson<{ folders: ConnectionFolder[] }>(FOLDERS_FILE, { folders: [] })
+  return data.folders ?? []
+}
+
+async function saveFolders(folders: ConnectionFolder[]): Promise<void> {
+  await writeJson(FOLDERS_FILE, { folders })
+}
+
+async function folderCreate(
+  name: string,
+  color: FolderColor,
+  parentId: string | null,
+): Promise<ConnectionFolder> {
+  const folders = await loadFolders()
+  if (parentId !== null) {
+    const parent = folders.find((f) => f.id === parentId)
+    if (!parent) throw new Error('Parent folder not found.')
+    // Enforce max depth 2: a parent that itself has a parent cannot nest further.
+    if (parent.parentId !== null) throw new Error('Maximum folder depth is 2')
+  }
+  const siblings = folders.filter((f) => f.parentId === parentId)
+  const order = siblings.reduce((max, f) => Math.max(max, f.order), -1) + 1
+  const folder: ConnectionFolder = {
+    id: randomUUID(),
+    name,
+    color,
+    collapsed: false,
+    parentId,
+    order,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+  await saveFolders([...folders, folder])
+  return folder
+}
+
+async function folderUpdate(id: string, patch: FolderPatch): Promise<ConnectionFolder> {
+  const folders = await loadFolders()
+  const folder = folders.find((f) => f.id === id)
+  if (!folder) throw new Error('Folder not found.')
+  const updated: ConnectionFolder = { ...folder, ...patch, updatedAt: nowIso() }
+  await saveFolders(folders.map((f) => (f.id === id ? updated : f)))
+  return updated
+}
+
+async function folderDelete(id: string): Promise<FolderDeleteResult> {
+  const folders = await loadFolders()
+  const target = folders.find((f) => f.id === id)
+  if (!target) throw new Error('Folder not found.')
+
+  // Connections inside move up one level (to the deleted folder's parent).
+  const connections = await loadConnections()
+  const affectedConnectionIds: string[] = []
+  const nextConnections = connections.map((c) => {
+    if ((c.folderId ?? null) === id) {
+      affectedConnectionIds.push(c.id)
+      return { ...c, folderId: target.parentId, updatedAt: nowIso() }
+    }
+    return c
+  })
+
+  // Child folders: if the deleted folder was a root, its children become roots.
+  const affectedFolderIds: string[] = []
+  const remaining = folders
+    .filter((f) => f.id !== id)
+    .map((f) => {
+      if (f.parentId === id) {
+        affectedFolderIds.push(f.id)
+        return { ...f, parentId: target.parentId, updatedAt: nowIso() }
+      }
+      return f
+    })
+
+  await saveFolders(remaining)
+  if (affectedConnectionIds.length > 0) await writeJson(CONNECTIONS_FILE, nextConnections)
+  return { deletedId: id, affectedConnectionIds, affectedFolderIds }
+}
+
+async function folderReorder(items: ReorderItem[]): Promise<void> {
+  const folders = await loadFolders()
+  const connections = await loadConnections()
+  const folderUpdates = new Map(items.filter((i) => i.type === 'folder').map((i) => [i.id, i]))
+  const connUpdates = new Map(items.filter((i) => i.type === 'connection').map((i) => [i.id, i]))
+
+  const nextFolders = folders.map((f) => {
+    const u = folderUpdates.get(f.id)
+    return u ? { ...f, parentId: u.parentId, order: u.order, updatedAt: nowIso() } : f
+  })
+  const nextConnections = connections.map((c) => {
+    const u = connUpdates.get(c.id)
+    return u ? { ...c, folderId: u.parentId, order: u.order, updatedAt: nowIso() } : c
+  })
+
+  await saveFolders(nextFolders)
+  if (connUpdates.size > 0) await writeJson(CONNECTIONS_FILE, nextConnections)
+}
+
 // ─── IPC registration ─────────────────────────────────────────────────────────
 
 function handle<T>(
@@ -188,4 +295,12 @@ export function registerConfigHandlers(): void {
   )
   handle(IPC.CONFIG.LOAD_PREFERENCES, () => loadPreferences())
   handle<SecretsBackend>(IPC.CONFIG.SECRETS_BACKEND, () => getSecretsBackend())
+
+  handle(IPC.FOLDER.CREATE, (_e, name: string, color: FolderColor, parentId: string | null) =>
+    folderCreate(name, color, parentId),
+  )
+  handle(IPC.FOLDER.UPDATE, (_e, id: string, patch: FolderPatch) => folderUpdate(id, patch))
+  handle(IPC.FOLDER.DELETE, (_e, id: string) => folderDelete(id))
+  handle(IPC.FOLDER.LIST, () => loadFolders())
+  handle(IPC.FOLDER.REORDER, (_e, items: ReorderItem[]) => folderReorder(items))
 }

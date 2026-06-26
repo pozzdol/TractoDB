@@ -1,0 +1,109 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  padding-right: var(--space-4);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.row:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.dropValid {
+  border-color: var(--color-accent);
+}
+
+.dropInvalid {
+  border-color: var(--color-danger);
+}
+
+.shake {
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  flex: 0 0 auto;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.renameInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border-focus);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.badge {
+  min-width: 16px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  text-align: center;
+  color: var(--color-text-tertiary);
+  background-color: var(--color-bg-active);
+  border-radius: var(--radius-full);
+}
+
+.dots {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.row:hover .dots {
+  opacity: 1;
+}
+
+/* Collapse animation — ponytail: fixed max-height cap covers typical folder sizes. */
+.children {
+  overflow: hidden;
+  max-height: 4000px;
+  transition: max-height var(--transition-slow);
+}
+
+.collapsed {
+  max-height: 0;
+}

@@ -1,11 +1,20 @@
 import { create } from 'zustand'
 import type {
   ConnectionConfig,
+  ConnectionFolder,
   ConnectionState,
   ConnectionWithPassword,
+  FolderColor,
+  FolderPatch,
+  ReorderItem,
 } from '@/types/connection'
 import type { DatabaseNode, TableNode } from '@/types/schema'
 import { api, unwrap } from './ipcClient'
+
+/** A node in the sidebar tree: a folder (with children) or a connection. */
+export type SidebarNode =
+  | { type: 'folder'; data: ConnectionFolder; children: SidebarNode[] }
+  | { type: 'connection'; data: ConnectionState }
 
 // ─── Immutable nested-update helpers ───────────────────────────────────────────
 
@@ -41,10 +50,17 @@ function toConnectionState(config: ConnectionConfig): ConnectionState {
 
 export interface ConnectionStore {
   connections: ConnectionState[]
+  folders: ConnectionFolder[]
   activeConnectionId: string | null
   activeDatabase: string | null
 
   loadConnections: () => Promise<void>
+  loadFolders: () => Promise<void>
+  createFolder: (name: string, color: FolderColor, parentId: string | null) => Promise<void>
+  updateFolder: (id: string, patch: FolderPatch) => Promise<void>
+  deleteFolder: (id: string) => Promise<void>
+  reorderItems: (items: ReorderItem[]) => Promise<void>
+  getSidebarTree: () => SidebarNode[]
   saveConnection: (input: ConnectionWithPassword) => Promise<ConnectionConfig>
   removeConnection: (id: string) => Promise<void>
   testConnection: (input: ConnectionWithPassword) => Promise<boolean>
@@ -66,12 +82,81 @@ export interface ConnectionStore {
 
 export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   connections: [],
+  folders: [],
   activeConnectionId: null,
   activeDatabase: null,
 
   async loadConnections() {
     const configs = unwrap(await api().config.loadConnections())
     set({ connections: configs.map(toConnectionState) })
+  },
+
+  async loadFolders() {
+    set({ folders: unwrap(await api().folder.list()) })
+  },
+
+  async createFolder(name, color, parentId) {
+    const folder = unwrap(await api().folder.create(name, color, parentId))
+    set((s) => ({ folders: [...s.folders, folder] }))
+  },
+
+  async updateFolder(id, patch) {
+    const updated = unwrap(await api().folder.update(id, patch))
+    set((s) => ({ folders: s.folders.map((f) => (f.id === id ? updated : f)) }))
+  },
+
+  async deleteFolder(id) {
+    const parentId = get().folders.find((f) => f.id === id)?.parentId ?? null
+    const res = unwrap(await api().folder.delete(id))
+    // Update store in place — avoid loadConnections (it would reset live status).
+    set((s) => ({
+      folders: s.folders
+        .filter((f) => f.id !== id)
+        .map((f) => (res.affectedFolderIds.includes(f.id) ? { ...f, parentId } : f)),
+      connections: s.connections.map((c) =>
+        res.affectedConnectionIds.includes(c.config.id)
+          ? { ...c, config: { ...c.config, folderId: parentId } }
+          : c,
+      ),
+    }))
+  },
+
+  async reorderItems(items) {
+    unwrap(await api().folder.reorder(items))
+    const fMap = new Map(items.filter((i) => i.type === 'folder').map((i) => [i.id, i]))
+    const cMap = new Map(items.filter((i) => i.type === 'connection').map((i) => [i.id, i]))
+    set((s) => ({
+      folders: s.folders.map((f) => {
+        const u = fMap.get(f.id)
+        return u ? { ...f, parentId: u.parentId, order: u.order } : f
+      }),
+      connections: s.connections.map((c) => {
+        const u = cMap.get(c.config.id)
+        return u ? { ...c, config: { ...c.config, folderId: u.parentId, order: u.order } } : c
+      }),
+    }))
+  },
+
+  getSidebarTree() {
+    const { connections, folders } = get()
+    const connNodes = (folderId: string | null): SidebarNode[] =>
+      connections
+        .filter((c) => (c.config.folderId ?? null) === folderId)
+        .sort((a, b) => (a.config.order ?? 0) - (b.config.order ?? 0))
+        .map((c) => ({ type: 'connection', data: c }))
+    const folderNode = (f: ConnectionFolder): SidebarNode => {
+      const childFolders = folders
+        .filter((cf) => cf.parentId === f.id)
+        .sort((a, b) => a.order - b.order)
+        .map(folderNode)
+      return { type: 'folder', data: f, children: [...childFolders, ...connNodes(f.id)] }
+    }
+    const rootFolders = folders
+      .filter((f) => f.parentId === null)
+      .sort((a, b) => a.order - b.order)
+      .map(folderNode)
+    // Ungrouped connections always come after all folders.
+    return [...rootFolders, ...connNodes(null)]
   },
 
   async saveConnection(input) {

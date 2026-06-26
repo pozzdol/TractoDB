@@ -40,6 +40,13 @@ export const IPC = {
     LOAD_PREFERENCES: 'config:loadPreferences',
     SECRETS_BACKEND: 'config:secretsBackend',
   },
+  FOLDER: {
+    CREATE: 'folder:create',
+    UPDATE: 'folder:update',
+    DELETE: 'folder:delete',
+    LIST: 'folder:list',
+    REORDER: 'folder:reorder',
+  },
   DIALOG: {
     OPEN: 'dialog:open',
     SAVE: 'dialog:save',
@@ -97,7 +104,49 @@ export interface ConnectionConfig {
   createdAt: string
   updatedAt: string
   color?: string  // custom color for sidebar indicator
-  group?: string  // folder/group name
+  group?: string  // folder/group name (legacy)
+  // Folder membership (Connection folder management). Optional for back-compat
+  // with pre-folder connections.json — treated as root (null) / 0 when absent.
+  folderId?: string | null // null = root (no folder)
+  order?: number           // sort order within its parent folder (or root)
+}
+
+// ─── Connection folders ───────────────────────────────────────────────────────
+
+export type FolderColor =
+  | 'default'
+  | 'blue'
+  | 'green'
+  | 'orange'
+  | 'red'
+  | 'purple'
+  | 'pink'
+
+export interface ConnectionFolder {
+  id: string
+  name: string
+  color: FolderColor
+  collapsed: boolean
+  parentId: string | null // null = root; max depth 2 (root → child → connections)
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type FolderPatch = Partial<Pick<ConnectionFolder, 'name' | 'color' | 'collapsed'>>
+
+/** One item in a batched drag-and-drop reorder/move commit. */
+export interface ReorderItem {
+  type: 'folder' | 'connection'
+  id: string
+  parentId: string | null // for connections this maps to folderId
+  order: number
+}
+
+export interface FolderDeleteResult {
+  deletedId: string
+  affectedConnectionIds: string[]
+  affectedFolderIds: string[]
 }
 
 export interface ConnectionWithPassword extends ConnectionConfig {
@@ -479,6 +528,17 @@ export interface DbStudioApi {
     savePreferences(preferences: UserPreferences): Promise<IpcResponse<void>>
     loadPreferences(): Promise<IpcResponse<UserPreferences>>
     secretsBackend(): Promise<IpcResponse<SecretsBackend>>
+  }
+  folder: {
+    create(
+      name: string,
+      color: FolderColor,
+      parentId: string | null,
+    ): Promise<IpcResponse<ConnectionFolder>>
+    update(id: string, patch: FolderPatch): Promise<IpcResponse<ConnectionFolder>>
+    delete(id: string): Promise<IpcResponse<FolderDeleteResult>>
+    list(): Promise<IpcResponse<ConnectionFolder[]>>
+    reorder(items: ReorderItem[]): Promise<IpcResponse<void>>
   }
   backup: {
     startBackup(config: BackupConfig): Promise<IpcResponse<void>>

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { IconChevronRight } from '@tabler/icons-react'
 import styles from './ContextMenu.module.css'
 
 export interface ContextMenuItem {
@@ -10,6 +11,8 @@ export interface ContextMenuItem {
   disabled?: boolean
   /** Render a divider; other fields ignored. */
   separator?: boolean
+  /** Nested submenu (opens to the right on hover). */
+  children?: ContextMenuItem[]
 }
 
 interface ContextMenuProps {
@@ -17,6 +20,50 @@ interface ContextMenuProps {
   y: number
   items: ContextMenuItem[]
   onClose: () => void
+}
+
+/** A list of menu items; reused for the root menu and for submenus. */
+function MenuList({ items, onClose }: { items: ContextMenuItem[]; onClose: () => void }) {
+  const [openSub, setOpenSub] = useState<number | null>(null)
+  return (
+    <>
+      {items.map((item, i) =>
+        item.separator ? (
+          <div key={`sep-${i}`} className={styles.separator} role="separator" />
+        ) : (
+          <div
+            key={item.label}
+            className={styles.itemWrap}
+            onMouseEnter={() => setOpenSub(item.children ? i : null)}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              className={`${styles.item} ${item.danger ? styles.danger : ''}`}
+              onClick={() => {
+                if (item.children) {
+                  setOpenSub((prev) => (prev === i ? null : i))
+                  return
+                }
+                onClose()
+                item.onClick?.()
+              }}
+            >
+              {item.icon ? <span className={styles.icon}>{item.icon}</span> : <span className={styles.icon} />}
+              <span className={styles.label}>{item.label}</span>
+              {item.children ? <IconChevronRight size={13} className={styles.subChevron} /> : null}
+            </button>
+            {item.children && openSub === i ? (
+              <div className={styles.submenu} role="menu">
+                <MenuList items={item.children} onClose={onClose} />
+              </div>
+            ) : null}
+          </div>
+        ),
+      )}
+    </>
+  )
 }
 
 /** A cursor-anchored menu rendered in a portal. Closes on outside click, Escape,
@@ -82,26 +129,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         }
       }}
     >
-      {items.map((item, i) =>
-        item.separator ? (
-          <div key={`sep-${i}`} className={styles.separator} role="separator" />
-        ) : (
-          <button
-            key={item.label}
-            type="button"
-            role="menuitem"
-            disabled={item.disabled}
-            className={`${styles.item} ${item.danger ? styles.danger : ''}`}
-            onClick={() => {
-              onClose()
-              item.onClick?.()
-            }}
-          >
-            {item.icon ? <span className={styles.icon}>{item.icon}</span> : <span className={styles.icon} />}
-            <span className={styles.label}>{item.label}</span>
-          </button>
-        ),
-      )}
+      <MenuList items={items} onClose={onClose} />
     </div>,
     document.body,
   )

@@ -60,6 +60,7 @@ function initialForm(editId: string | null): FormState {
 
 export function ConnectionForm() {
   const editId = useUiStore((s) => s.connectionForm.editId)
+  const defaultFolderId = useUiStore((s) => s.connectionForm.defaultFolderId)
   const close = useUiStore((s) => s.closeConnectionForm)
   const saveConnection = useConnectionStore((s) => s.saveConnection)
   const testConnection = useConnectionStore((s) => s.testConnection)
@@ -116,6 +117,9 @@ export function ConnectionForm() {
       databaseMode: supportsDbToggle ? form.databaseMode : 'single',
       environment: form.environment,
       password: form.password || undefined,
+      // Preserve folder on edit; place new connections in the requested folder.
+      folderId: existing ? (existing.folderId ?? null) : (defaultFolderId ?? null),
+      order: existing?.order ?? 0,
       createdAt: existing?.createdAt ?? '',
       updatedAt: '',
     }

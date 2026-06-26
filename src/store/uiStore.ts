@@ -44,6 +44,8 @@ export interface ConnectionFormState {
   open: boolean
   /** Connection id being edited, or null for a new connection. */
   editId: string | null
+  /** Pre-selected folder for a new connection ("New Connection in Folder"). */
+  defaultFolderId?: string | null
 }
 
 export interface UiStore {
@@ -59,7 +61,7 @@ export interface UiStore {
   clientPathOpen: boolean
   preferencesOpen: boolean
 
-  openConnectionForm: (editId?: string | null) => void
+  openConnectionForm: (editId?: string | null, defaultFolderId?: string | null) => void
   closeConnectionForm: () => void
   dismissSecretsWarning: () => void
   openBackup: (target: BackupTarget) => void
@@ -94,8 +96,8 @@ export const useUiStore = create<UiStore>((set, get) => ({
   clientPathOpen: false,
   preferencesOpen: false,
 
-  openConnectionForm(editId = null) {
-    set({ connectionForm: { open: true, editId } })
+  openConnectionForm(editId = null, defaultFolderId = null) {
+    set({ connectionForm: { open: true, editId, defaultFolderId } })
   },
 
   closeConnectionForm() {
