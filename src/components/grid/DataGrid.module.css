@@ -70,6 +70,38 @@
   box-shadow: inset 2px 0 0 0 var(--color-accent);
 }
 
+/* Per-column filter icon (hover-reveal; accent + dot when active). */
+.filterBtn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.th:hover .filterBtn,
+.filterActive {
+  opacity: 1;
+}
+
+.filterActive {
+  color: var(--color-accent);
+}
+
+.filterDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+}
+
 /* Resize hit area on the right edge of each header. */
 .resizer {
   position: absolute;

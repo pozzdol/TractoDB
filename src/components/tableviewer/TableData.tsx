@@ -4,12 +4,15 @@ import {
   IconClipboard,
   IconClipboardCheck,
   IconCopy,
+  IconFilterOff,
   IconRowInsertBottom,
   IconTrash,
+  IconX,
 } from '@tabler/icons-react'
 import { DataGrid } from '@/components/grid/DataGrid'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { ContextMenu } from '@/components/ui/ContextMenu'
 import { api } from '@/store/ipcClient'
 import { useTabStore } from '@/store/tabStore'
 import { qualifiedName, quoteIdent } from '@/lib/sqlIdent'
@@ -260,6 +263,58 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     return () => clearTimeout(t)
   }, [builtQuery, loading, isDirty, applyFilter])
 
+  // ── Column header filters (Feature 5) ──────────────────────────────────────
+  const [columnFilters, setColumnFilters] = useState<Map<string, unknown[]>>(new Map())
+  const [filtersMenu, setFiltersMenu] = useState<{ x: number; y: number } | null>(null)
+
+  const loadDistinct = useCallback(
+    async (colKey: string): Promise<unknown[]> => {
+      const qid = quoteIdent(dbType, colKey)
+      const sql = `SELECT DISTINCT ${qid} FROM ${qualified} ORDER BY ${qid} LIMIT 100`
+      const res = await api().query.execute(connectionId, sql, database)
+      return res.success ? res.data.rows.map((r) => r[colKey]) : []
+    },
+    [connectionId, database, qualified, dbType],
+  )
+
+  function buildWhere(map: Map<string, unknown[]>): string {
+    const parts: string[] = []
+    for (const [col, vals] of map) {
+      const qid = quoteIdent(dbType, col)
+      if (vals.length === 0) {
+        parts.push('1 = 0') // nothing selected → no rows
+        continue
+      }
+      const nonNull = vals.filter((v) => v !== null && v !== undefined)
+      const sub: string[] = []
+      if (nonNull.length) sub.push(`${qid} IN (${nonNull.map(literal).join(', ')})`)
+      if (vals.length > nonNull.length) sub.push(`${qid} IS NULL`)
+      parts.push(sub.length > 1 ? `(${sub.join(' OR ')})` : (sub[0] ?? '1 = 1'))
+    }
+    return parts.join(' AND ')
+  }
+
+  function applyFiltersMap(map: Map<string, unknown[]>): void {
+    setColumnFilters(map)
+    const where = buildWhere(map)
+    setClause('WHERE')
+    setFilterText(where)
+    requestApply(where ? buildClauseQuery('WHERE', qualified, where) : `SELECT * FROM ${qualified}`)
+  }
+  function applyColumnFilter(colKey: string, values: unknown[]): void {
+    const next = new Map(columnFilters)
+    next.set(colKey, values)
+    applyFiltersMap(next)
+  }
+  function clearColumnFilter(colKey: string): void {
+    const next = new Map(columnFilters)
+    next.delete(colKey)
+    applyFiltersMap(next)
+  }
+  function clearAllFilters(): void {
+    applyFiltersMap(new Map())
+  }
+
   // ── Display rows for the grid (carry __rowId + __state) ─────────────────────
   const displayRows = useMemo(
     () => editRows.map((er) => ({ ...er.current, __rowId: er.rowId, __state: er.state })),
@@ -503,6 +558,27 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
       >
         <IconClipboardCheck size={14} /> Paste
       </Button>
+      <span className={styles.opSep} />
+      <Button
+        variant="ghost"
+        className={styles.opBtn}
+        title="Clear all column filters"
+        aria-label="Clear filters"
+        disabled={columnFilters.size === 0}
+        onClick={clearAllFilters}
+      >
+        <IconFilterOff size={14} /> Clear Filters
+      </Button>
+      {columnFilters.size > 0 ? (
+        <button
+          type="button"
+          className={styles.filterBadge}
+          aria-label="Active filters"
+          onClick={(e) => setFiltersMenu({ x: e.clientX, y: e.clientY })}
+        >
+          {columnFilters.size} filter{columnFilters.size === 1 ? '' : 's'} active
+        </button>
+      ) : null}
     </div>
   )
 
@@ -561,6 +637,10 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         toolbarExtra={toolbar}
         onCopy={handleCopy}
         onPaste={() => void handlePaste()}
+        columnFilters={columnFilters}
+        onLoadDistinct={loadDistinct}
+        onApplyColumnFilter={applyColumnFilter}
+        onClearColumnFilter={clearColumnFilter}
       />
 
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
@@ -620,6 +700,19 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
             {counts.new + counts.modified + counts.deleted === 1 ? '' : 's'}? This cannot be undone.
           </p>
         </Modal>
+      ) : null}
+
+      {filtersMenu ? (
+        <ContextMenu
+          x={filtersMenu.x}
+          y={filtersMenu.y}
+          onClose={() => setFiltersMenu(null)}
+          items={[...columnFilters.entries()].map(([col, vals]) => ({
+            label: `${col} (${vals.length})`,
+            icon: <IconX size={14} />,
+            onClick: () => clearColumnFilter(col),
+          }))}
+        />
       ) : null}
 
       {pendingFilter !== null ? (

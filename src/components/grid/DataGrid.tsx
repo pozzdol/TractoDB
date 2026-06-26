@@ -15,12 +15,14 @@ import {
   IconBaselineDensitySmall,
   IconChevronDown,
   IconChevronUp,
+  IconFilter,
   IconGripHorizontal,
 } from '@tabler/icons-react'
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu'
 import { Button } from '@/components/ui/Button'
 import { ROW_HEIGHT_PRESETS, useGridLayout } from '@/hooks/useGridLayout'
 import type { QueryColumn } from '@/types/query'
+import { FilterPopover } from './FilterPopover'
 import styles from './DataGrid.module.css'
 
 const OVERSCAN = 6
@@ -50,6 +52,11 @@ interface DataGridProps {
   /** Ctrl+C / Ctrl+V within the grid. */
   onCopy?: () => void
   onPaste?: () => void
+  /** Per-column filters (Feature 5): active filter values keyed by column. */
+  columnFilters?: Map<string, unknown[]>
+  onLoadDistinct?: (colKey: string) => Promise<unknown[]>
+  onApplyColumnFilter?: (colKey: string, values: unknown[]) => void
+  onClearColumnFilter?: (colKey: string) => void
 }
 
 // Per-row marker (Table Viewer staged changes): read from row['__state'].
@@ -103,6 +110,10 @@ export function DataGrid({
   toolbarExtra,
   onCopy,
   onPaste,
+  columnFilters,
+  onLoadDistinct,
+  onApplyColumnFilter,
+  onClearColumnFilter,
 }: DataGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -118,6 +129,7 @@ export function DataGrid({
   const [editing, setEditing] = useState<{ index: number; column: string } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+  const [filterPopover, setFilterPopover] = useState<{ col: string; x: number; y: number } | null>(null)
 
   const ROW_NUM_WIDTH = 40 // fixed row-number column, not resizable/reorderable
 
@@ -479,6 +491,22 @@ export function DataGrid({
                   {sort?.column === col.name ? (
                     sort.dir === 'asc' ? <IconChevronUp size={11} /> : <IconChevronDown size={11} />
                   ) : null}
+                  {onLoadDistinct ? (
+                    <button
+                      type="button"
+                      className={`${styles.filterBtn} ${columnFilters?.has(col.name) ? styles.filterActive : ''}`}
+                      aria-label={`Filter ${col.name}`}
+                      title={`Filter ${col.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const r = e.currentTarget.closest('th')?.getBoundingClientRect()
+                        if (r) setFilterPopover({ col: col.name, x: r.left, y: r.bottom })
+                      }}
+                    >
+                      <IconFilter size={11} />
+                      {columnFilters?.has(col.name) ? <span className={styles.filterDot} /> : null}
+                    </button>
+                  ) : null}
                   <span
                     className={styles.resizer}
                     onMouseDown={(e) => startResize(e, col.name, width)}
@@ -588,6 +616,25 @@ export function DataGrid({
           <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
         ) : null}
       </div>
+      {filterPopover && onLoadDistinct ? (
+        <FilterPopover
+          key={filterPopover.col}
+          colKey={filterPopover.col}
+          width={displayColumns.find((c) => c.col.name === filterPopover.col)?.width ?? 220}
+          anchor={{ x: filterPopover.x, y: filterPopover.y }}
+          current={columnFilters?.get(filterPopover.col) ?? null}
+          loadValues={() => onLoadDistinct(filterPopover.col)}
+          onApply={(vals) => {
+            onApplyColumnFilter?.(filterPopover.col, vals)
+            setFilterPopover(null)
+          }}
+          onClear={() => {
+            onClearColumnFilter?.(filterPopover.col)
+            setFilterPopover(null)
+          }}
+          onClose={() => setFilterPopover(null)}
+        />
+      ) : null}
     </div>
   )
 }
