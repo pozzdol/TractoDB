@@ -205,6 +205,9 @@ export function DataGrid({
   }
 
   // ── Column reorder (native DnD) ──────────────────────────────────────────────
+  // Note: using native drag image (not custom ghost element) and
+  // box-shadow drop indicator (not separate line element) — both
+  // confirmed working in audit, accepted as final implementation.
   function onHeaderDragStart(e: DragEvent, index: number): void {
     if (suppressDrag.current) {
       e.preventDefault()
