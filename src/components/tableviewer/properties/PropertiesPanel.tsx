@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   IconBolt,
   IconCode,
@@ -20,7 +19,13 @@ import { PropertiesInfo } from './PropertiesInfo'
 import { PropertiesTriggers } from './PropertiesTriggers'
 import styles from './Properties.module.css'
 
-type Section = 'columns' | 'ddl' | 'info' | 'indexes' | 'fk' | 'triggers' | 'functions'
+export type Section = 'columns' | 'ddl' | 'info' | 'indexes' | 'fk' | 'triggers' | 'functions'
+
+interface PropertiesPanelProps extends TableTabProps {
+  /** Lifted to TableViewer so the section survives Data↔Properties switches. */
+  activeSection: Section
+  onSectionChange: (section: Section) => void
+}
 
 const SECTIONS: { id: Section; label: string; icon: ComponentType<IconProps> }[] = [
   { id: 'columns', label: 'Columns', icon: IconColumns },
@@ -32,9 +37,7 @@ const SECTIONS: { id: Section; label: string; icon: ComponentType<IconProps> }[]
   { id: 'functions', label: 'Functions', icon: IconMathFunction },
 ]
 
-export function PropertiesPanel(props: TableTabProps) {
-  const [section, setSection] = useState<Section>('columns')
-
+export function PropertiesPanel({ activeSection, onSectionChange, ...props }: PropertiesPanelProps) {
   return (
     <div className={styles.panel}>
       <div className={styles.nav} role="tablist" aria-orientation="vertical">
@@ -43,9 +46,9 @@ export function PropertiesPanel(props: TableTabProps) {
             key={id}
             type="button"
             role="tab"
-            aria-selected={section === id}
-            className={`${styles.navItem} ${section === id ? styles.navItemActive : ''}`}
-            onClick={() => setSection(id)}
+            aria-selected={activeSection === id}
+            className={`${styles.navItem} ${activeSection === id ? styles.navItemActive : ''}`}
+            onClick={() => onSectionChange(id)}
           >
             <span className={styles.navIcon}>
               <Icon size={12} />
@@ -55,13 +58,13 @@ export function PropertiesPanel(props: TableTabProps) {
         ))}
       </div>
       <div className={styles.content}>
-        {section === 'columns' && <PropertiesColumns {...props} />}
-        {section === 'ddl' && <PropertiesDDL {...props} />}
-        {section === 'info' && <PropertiesInfo {...props} />}
-        {section === 'indexes' && <PropertiesIndexes {...props} />}
-        {section === 'fk' && <PropertiesFK {...props} />}
-        {section === 'triggers' && <PropertiesTriggers {...props} />}
-        {section === 'functions' && <PropertiesFunctions {...props} />}
+        {activeSection === 'columns' && <PropertiesColumns {...props} />}
+        {activeSection === 'ddl' && <PropertiesDDL {...props} />}
+        {activeSection === 'info' && <PropertiesInfo {...props} />}
+        {activeSection === 'indexes' && <PropertiesIndexes {...props} />}
+        {activeSection === 'fk' && <PropertiesFK {...props} />}
+        {activeSection === 'triggers' && <PropertiesTriggers {...props} />}
+        {activeSection === 'functions' && <PropertiesFunctions {...props} />}
       </div>
     </div>
   )

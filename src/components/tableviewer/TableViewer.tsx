@@ -3,7 +3,7 @@ import { useConnectionStore } from '@/store/connectionStore'
 import type { TableViewerTab } from '@/store/tabStore'
 import type { DatabaseType } from '@/types/connection'
 import { TableData } from './TableData'
-import { PropertiesPanel } from './properties/PropertiesPanel'
+import { PropertiesPanel, type Section } from './properties/PropertiesPanel'
 import styles from './TableViewer.module.css'
 
 export interface TableTabProps {
@@ -26,6 +26,9 @@ export function TableViewer({ tab }: { tab: TableViewerTab }) {
   const connectionId = tab.connectionId
   const conn = useConnectionStore((s) => s.connections.find((c) => c.config.id === connectionId))
   const [sub, setSub] = useState<SubTab>('data')
+  // Lifted out of PropertiesPanel so the active section (and its loaded
+  // indexes/FK/triggers) survives switching to the Data tab and back.
+  const [propertiesSection, setPropertiesSection] = useState<Section>('columns')
 
   if (!connectionId || !conn || conn.status !== 'connected') {
     return <div className={styles.closed}>Connection is not open. Connect to view this table.</div>
@@ -61,7 +64,14 @@ export function TableViewer({ tab }: { tab: TableViewerTab }) {
       </div>
       <div className={styles.body}>
         {sub === 'data' && <TableData {...props} />}
-        {sub === 'properties' && <PropertiesPanel {...props} />}
+        {/* Kept mounted (display:none when hidden) so section state persists. */}
+        <div style={{ display: sub === 'properties' ? 'contents' : 'none' }}>
+          <PropertiesPanel
+            {...props}
+            activeSection={propertiesSection}
+            onSectionChange={setPropertiesSection}
+          />
+        </div>
       </div>
     </div>
   )
