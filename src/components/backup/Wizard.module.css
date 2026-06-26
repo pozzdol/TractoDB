@@ -41,6 +41,22 @@
   background-color: var(--color-bg-hover);
 }
 
+.selectAll {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: var(--weight-medium);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+}
+
+.allHeader {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-5);
+}
+
 .tag {
   margin-left: auto;
   font-size: var(--text-xs);

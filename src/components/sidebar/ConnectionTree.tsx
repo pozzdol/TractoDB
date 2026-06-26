@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import {
+  IconBolt,
   IconCopy,
   IconDownload,
   IconEdit,
@@ -136,6 +137,12 @@ export function ConnectionTree() {
       x: e.clientX,
       y: e.clientY,
       items: [
+        {
+          label: 'Backup All Tables…',
+          icon: <IconBolt size={14} />,
+          onClick: () => openBackup({ connectionId, databaseType, database, allTables: true }),
+        },
+        { label: 'sep', separator: true },
         {
           label: 'Backup database',
           icon: <IconDownload size={14} />,

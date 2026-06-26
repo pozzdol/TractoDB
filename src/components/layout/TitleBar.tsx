@@ -1,4 +1,5 @@
 import {
+  IconDatabaseExport,
   IconLayoutSidebar,
   IconLayoutSidebarRight,
   IconMoon,
@@ -8,6 +9,7 @@ import {
   IconSun,
   IconTerminal2,
 } from '@tabler/icons-react'
+import type { BackupDatabaseType } from '@shared/ipc'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
 import { useUiStore } from '@/store/uiStore'
@@ -24,13 +26,32 @@ export function TitleBar() {
   const openConnectionForm = useUiStore((s) => s.openConnectionForm)
   const openClientPath = useUiStore((s) => s.openClientPath)
   const openPreferences = useUiStore((s) => s.openPreferences)
+  const openBackup = useUiStore((s) => s.openBackup)
 
-  const activeName = useConnectionStore((s) => {
-    const active = s.connections.find((c) => c.config.id === s.activeConnectionId)
-    return active?.config.name ?? null
-  })
+  const active = useConnectionStore((s) =>
+    s.connections.find((c) => c.config.id === s.activeConnectionId),
+  )
+  const activeDatabase = useConnectionStore((s) => s.activeDatabase)
+  const activeName = active?.config.name ?? null
   const activeId = useConnectionStore((s) => s.activeConnectionId)
   const openQueryTab = useTabStore((s) => s.openQueryTab)
+
+  // Quick "backup current database" — only for connected pg/mysql with a database.
+  const backupType = active?.config.type
+  const backupDb = activeDatabase ?? active?.config.database ?? null
+  const canBackup =
+    active?.status === 'connected' &&
+    (backupType === 'postgresql' || backupType === 'mysql') &&
+    Boolean(backupDb)
+  function quickBackup(): void {
+    if (!active || !canBackup || !backupDb) return
+    openBackup({
+      connectionId: active.config.id,
+      databaseType: backupType as BackupDatabaseType,
+      database: backupDb,
+      allTables: true,
+    })
+  }
 
   return (
     <header className={styles.bar}>
@@ -70,6 +91,9 @@ export function TitleBar() {
           onClick={() => openQueryTab({ connectionId: activeId })}
         >
           <IconSquarePlus size={16} />
+        </IconButton>
+        <IconButton label="Backup current database" disabled={!canBackup} onClick={quickBackup}>
+          <IconDatabaseExport size={16} />
         </IconButton>
         <IconButton
           label={resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}

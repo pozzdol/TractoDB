@@ -390,6 +390,8 @@ export interface BackupProgress {
   isError: boolean
   isDone: boolean
   exitCode?: number
+  /** Output file size in bytes, sent with the final (isDone) event on success. */
+  bytes?: number
 }
 
 // ─── Native file dialogs ──────────────────────────────────────────────────────

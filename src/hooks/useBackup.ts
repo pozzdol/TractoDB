@@ -6,6 +6,8 @@ interface UseBackupResult {
   lines: BackupProgress[]
   isRunning: boolean
   exitCode: number | null
+  /** Output file size (bytes) reported on a successful finish; null otherwise. */
+  bytes: number | null
   startBackup: (config: BackupConfig) => Promise<void>
   startRestore: (config: RestoreConfig) => Promise<void>
   cancel: () => Promise<void>
@@ -20,6 +22,7 @@ export function useBackup(): UseBackupResult {
   const [lines, setLines] = useState<BackupProgress[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [exitCode, setExitCode] = useState<number | null>(null)
+  const [bytes, setBytes] = useState<number | null>(null)
   const runningRef = useRef(false)
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export function useBackup(): UseBackupResult {
         runningRef.current = false
         setIsRunning(false)
         setExitCode(progress.exitCode ?? null)
+        setBytes(progress.bytes ?? null)
       }
     })
     return unsubscribe
@@ -37,6 +41,7 @@ export function useBackup(): UseBackupResult {
   const begin = useCallback(() => {
     setLines([])
     setExitCode(null)
+    setBytes(null)
     runningRef.current = true
     setIsRunning(true)
   }, [])
@@ -73,9 +78,10 @@ export function useBackup(): UseBackupResult {
   const reset = useCallback(() => {
     setLines([])
     setExitCode(null)
+    setBytes(null)
     setIsRunning(false)
     runningRef.current = false
   }, [])
 
-  return { lines, isRunning, exitCode, startBackup, startRestore, cancel, reset }
+  return { lines, isRunning, exitCode, bytes, startBackup, startRestore, cancel, reset }
 }

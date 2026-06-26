@@ -1,6 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { type ChildProcess, spawn } from 'node:child_process'
-import { createReadStream, existsSync } from 'node:fs'
+import { createReadStream, existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 import {
   IPC,
@@ -55,6 +55,7 @@ function streamProcess(
   event: IpcMainInvokeEvent,
   child: ChildProcess,
   stdinFile?: string,
+  outputPath?: string,
 ): void {
   currentChild = child
   const send = (progress: BackupProgress): void => {
@@ -89,7 +90,15 @@ function streamProcess(
   })
   child.on('close', (code) => {
     currentChild = null
-    send({ line: '', isError: code !== 0, isDone: true, exitCode: code ?? -1 })
+    let bytes: number | undefined
+    if (code === 0 && outputPath) {
+      try {
+        bytes = statSync(outputPath).size
+      } catch {
+        // Output may be a directory format or unreadable — size is best-effort.
+      }
+    }
+    send({ line: '', isError: code !== 0, isDone: true, exitCode: code ?? -1, bytes })
   })
 }
 
@@ -115,7 +124,7 @@ async function handleStartBackup(
     const child = spawn(bin, pg.buildDumpArgs(config, conn), {
       env: { ...process.env, ...passwordEnv('postgresql', password) },
     })
-    streamProcess(event, child)
+    streamProcess(event, child, undefined, config.outputPath)
   } else {
     const bin = dir && binPath(dir, 'mysqldump')
     if (!bin) {
@@ -126,7 +135,7 @@ async function handleStartBackup(
     const child = spawn(bin, my.buildDumpArgs(config, conn), {
       env: { ...process.env, ...passwordEnv('mysql', password) },
     })
-    streamProcess(event, child)
+    streamProcess(event, child, undefined, config.outputPath)
   }
 }
 

@@ -14,6 +14,8 @@ export interface BackupTarget {
   connectionId: string
   databaseType: BackupDatabaseType
   database: string
+  /** Open the wizard at Step 2 with every table pre-selected (Backup All Tables). */
+  allTables?: boolean
 }
 
 export interface BackupModalState {

@@ -43,13 +43,26 @@ const DEFAULT_OPTIONS: Options = {
   extraArgs: '',
 }
 
+function formatBytes(n: number | null): string {
+  if (n === null || n < 0) return '—'
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let v = n / 1024
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i += 1
+  }
+  return `${v.toFixed(1)} ${units[i]}`
+}
+
 export function BackupWizard() {
   const target = useUiStore((s) => s.backupModal?.target)
   const close = useUiStore((s) => s.closeBackupModal)
   const openClientPath = useUiStore((s) => s.openClientPath)
-  const { lines, isRunning, exitCode, startBackup, cancel } = useBackup()
+  const { lines, isRunning, exitCode, bytes, startBackup, cancel } = useBackup()
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(target?.allTables ? 2 : 1)
   const [tables, setTables] = useState<TableInfo[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [options, setOptions] = useState<Options>(DEFAULT_OPTIONS)
@@ -60,10 +73,15 @@ export function BackupWizard() {
 
   useEffect(() => {
     if (!target) return
+    const pg = target.databaseType === 'postgresql'
+    const keyOf = (t: TableInfo): string => (pg && t.schema ? `${t.schema}.${t.name}` : t.name)
     void api()
       .schema.listTables(target.connectionId, target.database)
       .then((r) => {
-        if (r.success) setTables(r.data)
+        if (!r.success) return
+        setTables(r.data)
+        // "Backup All Tables" pre-selects everything.
+        if (target.allTables) setSelected(new Set(r.data.map(keyOf)))
       })
     void api()
       .backup.detectClient()
@@ -76,6 +94,20 @@ export function BackupWizard() {
 
   const tableKey = (t: TableInfo): string =>
     isPg && t.schema ? `${t.schema}.${t.name}` : t.name
+
+  const allKeys = tables.map(tableKey)
+  const allChecked = tables.length > 0 && selected.size === tables.length
+  const someChecked = selected.size > 0 && selected.size < tables.length
+  const tableCount = selected.size > 0 ? selected.size : tables.length
+  const summary = `Starting backup of ${tableCount} tables in database '${target.database}'...`
+  const completion =
+    exitCode === 0
+      ? `✓ Backup complete — ${tableCount} tables — output: ${outputPath} (${formatBytes(bytes)})`
+      : undefined
+
+  function toggleAll(): void {
+    setSelected(allChecked ? new Set() : new Set(allKeys))
+  }
 
   function toggle(key: string): void {
     setSelected((prev) => {
@@ -175,6 +207,19 @@ export function BackupWizard() {
         <div>
           <p className={styles.hint}>Leave everything unchecked to back up the whole database.</p>
           <div className={styles.checkList}>
+            {tables.length > 0 ? (
+              <label className={`${styles.checkItem} ${styles.selectAll}`}>
+                <input
+                  type="checkbox"
+                  ref={(el) => {
+                    if (el) el.indeterminate = someChecked
+                  }}
+                  checked={allChecked}
+                  onChange={toggleAll}
+                />
+                <span>Select All Tables</span>
+              </label>
+            ) : null}
             {tables.length === 0 ? (
               <p className={styles.muted}>No tables found.</p>
             ) : (
@@ -199,6 +244,9 @@ export function BackupWizard() {
 
       {step === 2 && (
         <div className={styles.options}>
+          {target.allTables ? (
+            <p className={styles.allHeader}>Backing up all tables in {target.database}</p>
+          ) : null}
           {isPg ? (
             <>
               <label className={styles.field}>
@@ -278,7 +326,15 @@ export function BackupWizard() {
         </div>
       )}
 
-      {step === 4 && <ProgressLog lines={lines} isRunning={isRunning} exitCode={exitCode} />}
+      {step === 4 && (
+        <ProgressLog
+          lines={lines}
+          isRunning={isRunning}
+          exitCode={exitCode}
+          summary={summary}
+          completion={completion}
+        />
+      )}
     </Modal>
   )
 }

@@ -31,6 +31,18 @@
   font-style: italic;
 }
 
+.summary {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-2);
+}
+
+.completion {
+  color: var(--color-success);
+  font-weight: var(--weight-medium);
+  margin-top: var(--space-2);
+}
+
 .status {
   font-size: var(--text-sm);
 }
