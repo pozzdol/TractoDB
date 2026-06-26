@@ -1,0 +1,80 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.head {
+  display: flex;
+}
+
+.trash {
+  color: var(--color-danger);
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.warn {
+  color: var(--color-text-secondary);
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.cascadeBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.cascadeWarn {
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+}
+
+.confirmField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.confirmInput {
+  height: 30px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.confirmInput:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.error {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}

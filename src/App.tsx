@@ -16,6 +16,7 @@ import { BackupWizard } from '@/components/backup/BackupWizard'
 import { RestoreWizard } from '@/components/backup/RestoreWizard'
 import { ClientPathModal } from '@/components/backup/ClientPathModal'
 import { PreferencesModal } from '@/components/settings/PreferencesModal'
+import { Toast } from '@/components/ui/Toast'
 import { useResizable } from '@/hooks/useResizable'
 import { useUiStore } from '@/store/uiStore'
 import { useConnectionStore } from '@/store/connectionStore'
@@ -41,6 +42,8 @@ export default function App() {
   const backupModal = useUiStore((s) => s.backupModal)
   const clientPathOpen = useUiStore((s) => s.clientPathOpen)
   const preferencesOpen = useUiStore((s) => s.preferencesOpen)
+  const toast = useUiStore((s) => s.toast)
+  const dismissToast = useUiStore((s) => s.dismissToast)
 
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null)
   const activeExecution = useQueryStore((s) => (activeTab ? s.byTab[activeTab.id] : undefined))
@@ -227,6 +230,7 @@ export default function App() {
       {preferencesOpen && <PreferencesModal />}
 
       {connectionFormOpen && <ConnectionForm />}
+      {toast ? <Toast message={toast} onDone={dismissToast} /> : null}
     </>
   )
 }

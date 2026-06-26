@@ -9,6 +9,7 @@ import {
 import type { MouseEvent, ReactNode } from 'react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
+import { useTableSelection, tableKey, type TableRef } from '@/store/tableSelectionStore'
 import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
 import type { DatabaseType } from '@/types/connection'
 import type { ColumnInfo, DatabaseNode, TableNode, TableType } from '@/types/schema'
@@ -19,6 +20,7 @@ export type TableContextHandler = (
   e: MouseEvent,
   database: string,
   table: string,
+  schema: string | undefined,
 ) => void
 
 export type DatabaseContextHandler = (e: MouseEvent, database: string) => void
@@ -68,15 +70,43 @@ function TableRow({
   connectionId,
   database,
   table,
+  siblings,
   onTableContextMenu,
 }: {
   connectionId: string
   database: string
   table: TableNode
+  /** All tables in the same database (for shift-range, filtered to same schema). */
+  siblings: TableNode[]
   onTableContextMenu: TableContextHandler
 }) {
   const toggleTable = useConnectionStore((s) => s.toggleTable)
   const openTableTab = useTabStore((s) => s.openTableTab)
+
+  const isTable = table.type === 'table'
+  const ref: TableRef = { connectionId, database, schema: table.schema, name: table.name }
+  const selected = useTableSelection((s) => s.selected.has(tableKey(ref)))
+  const open = (): void => {
+    openTableTab({ connectionId, database, table: table.name, schema: table.schema })
+  }
+
+  function onActivate(e: MouseEvent): void {
+    if (!isTable) {
+      open() // views/functions aren't selectable — single click opens
+      return
+    }
+    const sel = useTableSelection.getState()
+    if (e.shiftKey) {
+      const refs = siblings
+        .filter((t) => t.type === 'table' && (t.schema ?? '') === (table.schema ?? ''))
+        .map((t): TableRef => ({ connectionId, database, schema: t.schema, name: t.name }))
+      sel.selectRange(ref, refs)
+    } else if (e.ctrlKey || e.metaKey) {
+      sel.toggle(ref)
+    } else {
+      sel.selectOnly(ref)
+    }
+  }
 
   return (
     <>
@@ -88,12 +118,12 @@ function TableRow({
         loading={table.expanded && table.loadingColumns}
         label={table.name}
         icon={tableIcon(table.type)}
+        selected={selected}
         meta={table.rowCount !== undefined ? <span>{table.rowCount}</span> : undefined}
-        onActivate={() =>
-          openTableTab({ connectionId, database, table: table.name, schema: table.schema })
-        }
+        onActivate={onActivate}
+        onDoubleClick={open}
         onToggle={() => void toggleTable(connectionId, database, table.name)}
-        onContextMenu={(e) => onTableContextMenu(e, database, table.name)}
+        onContextMenu={(e) => onTableContextMenu(e, database, table.name, table.schema)}
       />
       {table.expanded && table.columns
         ? table.columns.length > 0
@@ -130,7 +160,10 @@ function DatabaseRow({
         label={database.name}
         icon={<DatabaseIcon type={dbType} size={14} />}
         meta={database.size ? <span>{database.size}</span> : undefined}
-        onActivate={() => void toggleDatabase(connectionId, database.name)}
+        onActivate={() => {
+          useTableSelection.getState().clear() // clicking a database clears table selection
+          void toggleDatabase(connectionId, database.name)
+        }}
         onToggle={() => void toggleDatabase(connectionId, database.name)}
         onContextMenu={
           onDatabaseContextMenu ? (e) => onDatabaseContextMenu(e, database.name) : undefined
@@ -144,6 +177,7 @@ function DatabaseRow({
                 connectionId={connectionId}
                 database={database.name}
                 table={t}
+                siblings={database.tables ?? []}
                 onTableContextMenu={onTableContextMenu}
               />
             ))

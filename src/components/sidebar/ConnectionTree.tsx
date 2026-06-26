@@ -31,8 +31,10 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
+import { useTableSelection, type TableRef } from '@/store/tableSelectionStore'
 import { ConnectionItem } from './ConnectionItem'
 import { FolderItem, FOLDER_COLORS, FOLDER_COLOR_ORDER } from './FolderItem'
+import { DeleteTableDialog } from './DeleteTableDialog'
 import styles from './ConnectionTree.module.css'
 
 interface MenuState {
@@ -59,11 +61,13 @@ export function ConnectionTree() {
   const updateFolder = useConnectionStore((s) => s.updateFolder)
   const deleteFolder = useConnectionStore((s) => s.deleteFolder)
   const reorderItems = useConnectionStore((s) => s.reorderItems)
+  const loadTablesInternal = useConnectionStore((s) => s.loadTablesInternal)
   const openQueryTab = useTabStore((s) => s.openQueryTab)
   const openTableTab = useTabStore((s) => s.openTableTab)
   const openConnectionForm = useUiStore((s) => s.openConnectionForm)
   const openBackup = useUiStore((s) => s.openBackup)
   const openRestore = useUiStore((s) => s.openRestore)
+  const showToast = useUiStore((s) => s.showToast)
 
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -72,8 +76,54 @@ export function ConnectionTree() {
   const [dropTarget, setDropTarget] = useState<{ folderId: string; valid: boolean } | null>(null)
   const [rootInsert, setRootInsert] = useState<number | null>(null)
   const [shakeId, setShakeId] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<
+    { tables: TableRef[]; connectionId: string; dbType: DatabaseType } | null
+  >(null)
   const dragRef = useRef<DragRef>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
+
+  // Open the delete dialog for the current table selection (within one connection).
+  function openDeleteForSelection(connectionId: string): void {
+    const conn = connections.find((c) => c.config.id === connectionId)
+    if (!conn) return
+    if (conn.config.environment === 'production') {
+      showToast('⛔ Cannot delete tables on a production connection.')
+      return
+    }
+    const tables = [...useTableSelection.getState().selected.values()].filter(
+      (t) => t.connectionId === connectionId,
+    )
+    if (tables.length === 0) return
+    setDeleteDialog({ tables, connectionId, dbType: conn.config.type })
+  }
+
+  // After a successful drop: clear selection, close affected tabs, re-sync the tree.
+  function onTablesDropped(connectionId: string, dropped: TableRef[]): void {
+    useTableSelection.getState().clear()
+    setDeleteDialog(null)
+    const ts = useTabStore.getState()
+    for (const ref of dropped) {
+      const tab = ts.tabs.find(
+        (t) =>
+          t.type === 'table-viewer' &&
+          t.connectionId === connectionId &&
+          t.database === ref.database &&
+          t.table === ref.name,
+      )
+      if (tab) {
+        ts.setTabDirty(tab.id, false) // table is gone — skip the unsaved-changes prompt
+        ts.closeTab(tab.id)
+      }
+    }
+    for (const db of new Set(dropped.map((r) => r.database))) {
+      void loadTablesInternal(connectionId, db)
+    }
+    showToast(
+      dropped.length === 1
+        ? `Table '${dropped[0]?.name}' dropped successfully.`
+        : `${dropped.length} tables dropped successfully.`,
+    )
+  }
 
   useEffect(() => {
     void loadConnections()
@@ -98,6 +148,19 @@ export function ConnectionTree() {
     const next =
       e.key === 'ArrowDown' ? Math.min(items.length - 1, index + 1) : Math.max(0, index === -1 ? 0 : index - 1)
     items[next]?.focus()
+  }
+
+  // Delete key on the sidebar: open the delete dialog for the selected tables.
+  function onBodyKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Delete') {
+      const sel = [...useTableSelection.getState().selected.values()]
+      if (sel.length === 0) return
+      e.preventDefault()
+      const first = sel[0]
+      if (first) openDeleteForSelection(first.connectionId)
+      return
+    }
+    onTreeKeyDown(e)
   }
 
   // ── Drag and drop ───────────────────────────────────────────────────────────
@@ -259,22 +322,42 @@ export function ConnectionTree() {
     })
   }
 
-  function openTableMenu(e: MouseEvent, connectionId: string, database: string, table: string): void {
+  function openTableMenu(
+    e: MouseEvent,
+    connectionId: string,
+    database: string,
+    table: string,
+    schema: string | undefined,
+  ): void {
     e.preventDefault()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        { label: 'Open Table', icon: <IconTable size={14} />, onClick: () => openTableTab({ connectionId, database, table }) },
-        {
-          label: 'New Query',
-          icon: <IconFileCode size={14} />,
-          onClick: () => openQueryTab({ connectionId, database, title: table, sql: `SELECT * FROM ${table} LIMIT 100;` }),
-        },
-        { label: 'sep', separator: true },
-        { label: 'Copy Name', icon: <IconCopy size={14} />, onClick: () => void navigator.clipboard.writeText(table) },
-      ],
-    })
+    // Right-clicking a table not in the current selection selects only it.
+    useTableSelection.getState().selectIfNot({ connectionId, database, schema, name: table })
+    const selectedCount = [...useTableSelection.getState().selected.values()].filter(
+      (t) => t.connectionId === connectionId,
+    ).length
+    const isProduction =
+      connections.find((c) => c.config.id === connectionId)?.config.environment === 'production'
+    const items: ContextMenuItem[] = [
+      { label: 'Open Table', icon: <IconTable size={14} />, onClick: () => openTableTab({ connectionId, database, table, schema }) },
+      {
+        label: 'New Query',
+        icon: <IconFileCode size={14} />,
+        onClick: () => openQueryTab({ connectionId, database, title: table, sql: `SELECT * FROM ${table} LIMIT 100;` }),
+      },
+      { label: 'sep', separator: true },
+      { label: 'Copy Name', icon: <IconCopy size={14} />, onClick: () => void navigator.clipboard.writeText(table) },
+    ]
+    // Delete is hidden entirely on production connections.
+    if (!isProduction) {
+      items.push({ label: 'sep2', separator: true })
+      items.push({
+        label: selectedCount > 1 ? `Delete ${selectedCount} Tables…` : 'Delete Table…',
+        icon: <IconTrash size={14} />,
+        danger: true,
+        onClick: () => openDeleteForSelection(connectionId),
+      })
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
   function openDatabaseMenu(e: MouseEvent, connectionId: string, type: DatabaseType, database: string): void {
@@ -344,7 +427,7 @@ export function ConnectionTree() {
         <ConnectionItem
           connection={node.data}
           onConnectionContextMenu={openConnectionMenu}
-          onTableContextMenu={(e, database, table) => openTableMenu(e, node.data.config.id, database, table)}
+          onTableContextMenu={(e, database, table, schema) => openTableMenu(e, node.data.config.id, database, table, schema)}
           onDatabaseContextMenu={(e, database) => openDatabaseMenu(e, node.data.config.id, node.data.config.type, database)}
         />
       </div>
@@ -381,7 +464,7 @@ export function ConnectionTree() {
         </span>
       </div>
 
-      <div className={styles.body} ref={bodyRef} onKeyDown={onTreeKeyDown}>
+      <div className={styles.body} ref={bodyRef} onKeyDown={onBodyKeyDown}>
         {connections.length === 0 && folders.length === 0 && !creating ? (
           <div className={styles.empty}>
             <p className={styles.emptyText}>No connections yet.</p>
@@ -405,6 +488,16 @@ export function ConnectionTree() {
       </div>
 
       {menu ? <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} /> : null}
+
+      {deleteDialog ? (
+        <DeleteTableDialog
+          connectionId={deleteDialog.connectionId}
+          dbType={deleteDialog.dbType}
+          tables={deleteDialog.tables}
+          onClose={() => setDeleteDialog(null)}
+          onDone={(dropped) => onTablesDropped(deleteDialog.connectionId, dropped)}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <Modal

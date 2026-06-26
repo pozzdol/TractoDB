@@ -60,6 +60,8 @@ export interface UiStore {
   backupModal: BackupModalState | null
   clientPathOpen: boolean
   preferencesOpen: boolean
+  /** Transient toast message (auto-dismissed by the renderer). */
+  toast: string | null
 
   openConnectionForm: (editId?: string | null, defaultFolderId?: string | null) => void
   closeConnectionForm: () => void
@@ -71,6 +73,8 @@ export interface UiStore {
   closeClientPath: () => void
   openPreferences: () => void
   closePreferences: () => void
+  showToast: (message: string) => void
+  dismissToast: () => void
 
   hydrate: () => Promise<void>
   setTheme: (theme: Theme) => void
@@ -95,6 +99,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   backupModal: null,
   clientPathOpen: false,
   preferencesOpen: false,
+  toast: null,
 
   openConnectionForm(editId = null, defaultFolderId = null) {
     set({ connectionForm: { open: true, editId, defaultFolderId } })
@@ -130,6 +135,14 @@ export const useUiStore = create<UiStore>((set, get) => ({
 
   closePreferences() {
     set({ preferencesOpen: false })
+  },
+
+  showToast(message) {
+    set({ toast: message })
+  },
+
+  dismissToast() {
+    set({ toast: null })
   },
 
   dismissSecretsWarning() {

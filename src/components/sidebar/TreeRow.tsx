@@ -18,9 +18,12 @@ interface TreeRowProps {
   compact?: boolean
   /** Render the label in danger red (e.g. production connection). */
   danger?: boolean
+  /** Multi-select highlight (accent bg + left border) — table delete selection. */
+  selected?: boolean
   meta?: ReactNode
   title?: string
-  onActivate?: () => void
+  onActivate?: (e: MouseEvent) => void
+  onDoubleClick?: () => void
   onToggle?: () => void
   onContextMenu?: (e: MouseEvent) => void
 }
@@ -38,16 +41,18 @@ export function TreeRow({
   active = false,
   compact = false,
   danger = false,
+  selected = false,
   meta,
   title,
   onActivate,
+  onDoubleClick,
   onToggle,
   onContextMenu,
 }: TreeRowProps) {
   function onKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      onActivate?.()
+      onActivate?.(e as unknown as MouseEvent)
     } else if (e.key === 'ArrowRight' && expandable && !expanded) {
       e.preventDefault()
       onToggle?.()
@@ -62,6 +67,7 @@ export function TreeRow({
     compact ? styles.compact : '',
     active ? styles.active : '',
     danger ? styles.danger : '',
+    selected ? styles.selected : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -76,6 +82,7 @@ export function TreeRow({
       tabIndex={0}
       title={title ?? label}
       onClick={onActivate}
+      onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onKeyDown={onKeyDown}
     >

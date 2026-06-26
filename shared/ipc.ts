@@ -25,6 +25,7 @@ export const IPC = {
     GET_TABLE_INFO: 'schema:getTableInfo',
     GET_INDEXES: 'schema:getIndexes',
     GET_FOREIGN_KEYS: 'schema:getForeignKeys',
+    DROP_TABLES: 'schema:dropTables',
   },
   TABLE: {
     UPDATE_CELL: 'table:updateCell',
@@ -266,6 +267,17 @@ export interface TableDetails {
   rowCount?: number
   sizePretty?: string
   comment?: string
+}
+
+/** A table targeted for DROP. */
+export interface DropTableTarget {
+  database: string
+  schema?: string
+  name: string
+}
+
+export interface DropTablesResult {
+  dropped: string[]
 }
 
 export interface TableRef {
@@ -514,6 +526,11 @@ export interface TractoDbApi {
     getTableInfo(ref: TableRef): Promise<IpcResponse<TableDetails>>
     getIndexes(ref: TableRef): Promise<IpcResponse<IndexInfo[]>>
     getForeignKeys(ref: TableRef): Promise<IpcResponse<ForeignKeyInfo[]>>
+    dropTables(
+      connectionId: string,
+      tables: DropTableTarget[],
+      cascade: boolean,
+    ): Promise<IpcResponse<DropTablesResult>>
   }
   table: {
     updateCell(request: UpdateCellRequest): Promise<IpcResponse<void>>

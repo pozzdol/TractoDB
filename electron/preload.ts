@@ -35,6 +35,8 @@ const api: TractoDbApi = {
     getTableInfo: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_TABLE_INFO, ref),
     getIndexes: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_INDEXES, ref),
     getForeignKeys: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_FOREIGN_KEYS, ref),
+    dropTables: (connectionId, tables, cascade) =>
+      ipcRenderer.invoke(IPC.SCHEMA.DROP_TABLES, connectionId, tables, cascade),
   },
   table: {
     updateCell: (request) => ipcRenderer.invoke(IPC.TABLE.UPDATE_CELL, request),

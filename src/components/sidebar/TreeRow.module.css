@@ -40,6 +40,19 @@
   color: var(--color-accent);
 }
 
+/* Multi-select highlight for table-delete selection. */
+.selected,
+.selected:hover {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent-text);
+  box-shadow: inset 2px 0 0 0 var(--color-accent);
+}
+
+.selected .label,
+.selected .icon {
+  color: var(--color-accent-text);
+}
+
 .chevron {
   display: inline-flex;
   align-items: center;
