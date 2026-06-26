@@ -25,6 +25,8 @@ export const IPC = {
     GET_TABLE_INFO: 'schema:getTableInfo',
     GET_INDEXES: 'schema:getIndexes',
     GET_FOREIGN_KEYS: 'schema:getForeignKeys',
+    GET_TRIGGERS: 'schema:getTriggers',
+    GET_RELATED_FUNCTIONS: 'schema:getRelatedFunctions',
     DROP_TABLES: 'schema:dropTables',
   },
   TABLE: {
@@ -251,6 +253,7 @@ export interface IndexInfo {
   columns: string[]
   unique: boolean
   type?: string
+  isPrimary?: boolean
 }
 
 export interface ForeignKeyInfo {
@@ -258,6 +261,23 @@ export interface ForeignKeyInfo {
   column: string
   referencedTable: string
   referencedColumn: string
+  foreignSchema?: string
+  onUpdate?: string
+  onDelete?: string
+}
+
+export interface TriggerInfo {
+  name: string
+  event: string // INSERT, UPDATE, DELETE (joined with '/' when multiple)
+  timing: string // BEFORE, AFTER, INSTEAD OF
+  body: string
+}
+
+export interface RelatedFunctionInfo {
+  name: string
+  arguments: string
+  returnType: string
+  definition: string
 }
 
 export interface TableDetails {
@@ -526,6 +546,8 @@ export interface TractoDbApi {
     getTableInfo(ref: TableRef): Promise<IpcResponse<TableDetails>>
     getIndexes(ref: TableRef): Promise<IpcResponse<IndexInfo[]>>
     getForeignKeys(ref: TableRef): Promise<IpcResponse<ForeignKeyInfo[]>>
+    getTriggers(ref: TableRef): Promise<IpcResponse<TriggerInfo[]>>
+    getRelatedFunctions(ref: TableRef): Promise<IpcResponse<RelatedFunctionInfo[]>>
     dropTables(
       connectionId: string,
       tables: DropTableTarget[],

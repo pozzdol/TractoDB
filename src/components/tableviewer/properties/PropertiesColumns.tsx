@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { api } from '@/store/ipcClient'
 import type { AlterColumnAction, ColumnInfo } from '@shared/ipc'
-import type { TableTabProps } from './TableViewer'
-import styles from './TableColumns.module.css'
+import type { TableTabProps } from '../TableViewer'
+import styles from './PropertiesColumns.module.css'
 
 interface Edit {
   dataType?: string
@@ -28,7 +28,13 @@ function keyLabel(c: ColumnInfo): string {
 
 // ponytail: comment editing is dialect-specific (COMMENT ON COLUMN / inline);
 // shown read-only here. Add per-dialect comment ALTER when needed.
-export function TableColumns({ connectionId, database, schema, table, readOnly }: TableTabProps) {
+export function PropertiesColumns({
+  connectionId,
+  database,
+  schema,
+  table,
+  readOnly,
+}: TableTabProps) {
   const [cols, setCols] = useState<ColumnInfo[]>([])
   const [edits, setEdits] = useState<Record<string, Edit>>({})
   const [dropped, setDropped] = useState<Set<string>>(new Set())

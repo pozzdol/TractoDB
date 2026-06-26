@@ -3,9 +3,7 @@ import { useConnectionStore } from '@/store/connectionStore'
 import type { TableViewerTab } from '@/store/tabStore'
 import type { DatabaseType } from '@/types/connection'
 import { TableData } from './TableData'
-import { TableDDL } from './TableDDL'
-import { TableColumns } from './TableColumns'
-import { TableInfo } from './TableInfo'
+import { PropertiesPanel } from './properties/PropertiesPanel'
 import styles from './TableViewer.module.css'
 
 export interface TableTabProps {
@@ -18,12 +16,10 @@ export interface TableTabProps {
   readOnly: boolean
 }
 
-type SubTab = 'data' | 'ddl' | 'columns' | 'info'
+type SubTab = 'data' | 'properties'
 const SUBTABS: { id: SubTab; label: string }[] = [
   { id: 'data', label: 'Data' },
-  { id: 'ddl', label: 'DDL' },
-  { id: 'columns', label: 'Columns' },
-  { id: 'info', label: 'Info' },
+  { id: 'properties', label: 'Properties' },
 ]
 
 export function TableViewer({ tab }: { tab: TableViewerTab }) {
@@ -65,9 +61,7 @@ export function TableViewer({ tab }: { tab: TableViewerTab }) {
       </div>
       <div className={styles.body}>
         {sub === 'data' && <TableData {...props} />}
-        {sub === 'ddl' && <TableDDL {...props} />}
-        {sub === 'columns' && <TableColumns {...props} />}
-        {sub === 'info' && <TableInfo {...props} />}
+        {sub === 'properties' && <PropertiesPanel {...props} />}
       </div>
     </div>
   )
