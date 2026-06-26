@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconAlertTriangle,
   IconClipboard,
@@ -16,6 +16,7 @@ import { qualifiedName, quoteIdent } from '@/lib/sqlIdent'
 import type { DatabaseType } from '@/types/connection'
 import type { QueryColumn } from '@/types/query'
 import type { TableTabProps } from './TableViewer'
+import { ColumnSqlBar, buildClauseQuery, type Clause } from './ColumnSqlBar'
 import styles from './TableData.module.css'
 
 type Row = Record<string, unknown>
@@ -125,6 +126,16 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
+  // Column SQL bar (Feature 4)
+  const [clause, setClause] = useState<Clause>('WHERE')
+  const [filterText, setFilterText] = useState('')
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [applying, setApplying] = useState(false)
+  const [pendingFilter, setPendingFilter] = useState<string | null>(null)
+  const appliedQueryRef = useRef<string>(`SELECT * FROM ${qualified}`)
+  const builtQuery = buildClauseQuery(clause, qualified, filterText)
+  const columnNames = useMemo(() => columns.map((c) => c.name), [columns])
+
   const editable = !readOnly && pkColumn !== null
   const counts = useMemo(() => countByState(editRows), [editRows])
   const isDirty = counts.new + counts.modified + counts.deleted > 0
@@ -133,13 +144,11 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     return pkColumn != null && dbRow[pkColumn] != null ? `pk:${String(dbRow[pkColumn])}` : `idx:${idx}`
   }
 
-  const loadPage = useCallback(
-    async (offset: number) => {
-      const res = await api().query.execute(connectionId, `SELECT * FROM ${qualified}`, database, offset, PAGE)
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
+  // Run a page of `query`; returns the outcome so callers choose where to show errors.
+  const runPage = useCallback(
+    async (query: string, offset: number): Promise<{ ok: boolean; error?: string }> => {
+      const res = await api().query.execute(connectionId, query, database, offset, PAGE)
+      if (!res.success) return { ok: false, error: res.error }
       const data = res.data
       setColumns(data.columns)
       setTotalCount(data.totalCount)
@@ -150,9 +159,10 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         )
         return offset === 0 ? fresh : [...prev, ...fresh]
       })
+      return { ok: true }
     },
-    // rowIdOf depends on pkColumn; intentionally re-create loadPage when pk known
-    [connectionId, qualified, database, pkColumn],
+    // rowIdOf depends on pkColumn; intentionally re-create when pk known
+    [connectionId, database, pkColumn],
   )
 
   const reload = useCallback(async () => {
@@ -161,12 +171,14 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     setEditRows([])
     const cols = await api().schema.listColumns(connectionId, database, schema ? `${schema}.${table}` : table)
     if (cols.success) setPkColumn(cols.data.find((c) => c.isPrimaryKey)?.name ?? null)
-    await loadPage(0)
+    const r = await runPage(appliedQueryRef.current, 0)
+    if (!r.ok) setError(r.error ?? 'Failed to load.')
     setLoading(false)
-  }, [connectionId, database, schema, table, loadPage])
+  }, [connectionId, database, schema, table, runPage])
 
   useEffect(() => {
     let cancelled = false
+    appliedQueryRef.current = `SELECT * FROM ${qualified}`
     void (async () => {
       setLoading(true)
       setError(null)
@@ -209,9 +221,44 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
   async function loadMore(): Promise<void> {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    await loadPage(editRows.filter((r) => r.state !== 'new').length)
+    await runPage(appliedQueryRef.current, editRows.filter((r) => r.state !== 'new').length)
     setLoadingMore(false)
   }
+
+  // ── Column SQL bar: apply / clear / debounced auto-apply ────────────────────
+  const applyFilter = useCallback(
+    async (query: string) => {
+      setApplying(true)
+      setFilterError(null)
+      const r = await runPage(query, 0)
+      if (r.ok) appliedQueryRef.current = query
+      else setFilterError(r.error ?? 'Query failed.')
+      setApplying(false)
+    },
+    [runPage],
+  )
+
+  function requestApply(query: string): void {
+    if (query === appliedQueryRef.current) return
+    if (isDirty) setPendingFilter(query)
+    else void applyFilter(query)
+  }
+
+  function clearFilter(): void {
+    setFilterText('')
+    setFilterError(null)
+    requestApply(`SELECT * FROM ${qualified}`)
+  }
+
+  // Auto-apply 800ms after typing stops.
+  useEffect(() => {
+    if (loading || builtQuery === appliedQueryRef.current) return
+    const t = setTimeout(() => {
+      if (isDirty) setPendingFilter(builtQuery)
+      else void applyFilter(builtQuery)
+    }, 800)
+    return () => clearTimeout(t)
+  }, [builtQuery, loading, isDirty, applyFilter])
 
   // ── Display rows for the grid (carry __rowId + __state) ─────────────────────
   const displayRows = useMemo(
@@ -461,6 +508,18 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
 
   return (
     <div className={styles.wrap}>
+      <ColumnSqlBar
+        clause={clause}
+        value={filterText}
+        builtQuery={builtQuery}
+        columns={columnNames}
+        error={filterError}
+        loading={applying}
+        onClauseChange={setClause}
+        onChange={setFilterText}
+        onApply={() => requestApply(builtQuery)}
+        onClear={clearFilter}
+      />
       {isDirty ? (
         <div className={styles.saveBar} role="status">
           <span className={styles.saveMsg}>
@@ -559,6 +618,36 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
           <p>
             Discard {counts.new + counts.modified + counts.deleted} unsaved change
             {counts.new + counts.modified + counts.deleted === 1 ? '' : 's'}? This cannot be undone.
+          </p>
+        </Modal>
+      ) : null}
+
+      {pendingFilter !== null ? (
+        <Modal
+          title="Unsaved changes"
+          size="sm"
+          onClose={() => setPendingFilter(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setPendingFilter(null)}>
+                Keep Editing
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  const q = pendingFilter
+                  setPendingFilter(null)
+                  void applyFilter(q)
+                }}
+              >
+                Apply Filter &amp; Discard Changes
+              </Button>
+            </>
+          }
+        >
+          <p>
+            You have unsaved changes. Applying a new filter will reload the table and discard your
+            changes. Continue?
           </p>
         </Modal>
       ) : null}
