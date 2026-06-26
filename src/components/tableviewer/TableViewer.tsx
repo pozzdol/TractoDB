@@ -9,6 +9,7 @@ import { TableInfo } from './TableInfo'
 import styles from './TableViewer.module.css'
 
 export interface TableTabProps {
+  tabId: string
   connectionId: string
   database: string
   schema?: string
@@ -36,6 +37,7 @@ export function TableViewer({ tab }: { tab: TableViewerTab }) {
 
   const readOnly = conn.config.environment === 'production'
   const props: TableTabProps = {
+    tabId: tab.id,
     connectionId,
     database: tab.database,
     schema: tab.schema,

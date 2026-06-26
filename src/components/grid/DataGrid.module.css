@@ -139,6 +139,21 @@ tbody tr {
   font-weight: var(--weight-medium);
 }
 
+/* Staged-change row markers (left border on the row-number cell). */
+.markNew {
+  box-shadow: inset 3px 0 0 0 var(--color-success);
+}
+.markModified {
+  box-shadow: inset 3px 0 0 0 var(--color-warning);
+}
+.markDeleted {
+  box-shadow: inset 3px 0 0 0 var(--color-danger);
+}
+.rowDeleted td {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 .rowNumHead {
   text-align: center;
   padding: 0;

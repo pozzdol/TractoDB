@@ -34,11 +34,26 @@ export function TabBar() {
   const closeTab = useTabStore((s) => s.closeTab)
   const openQueryTab = useTabStore((s) => s.openQueryTab)
   const reorderTabs = useTabStore((s) => s.reorderTabs)
+  const dirtyTabs = useTabStore((s) => s.dirtyTabs)
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId)
 
   const dragIndex = useRef<number | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+
+  // A tab with changes the user would lose: typed query SQL, or staged table edits.
+  const tabUnsaved = (tab: Tab): boolean =>
+    isUnsaved(tab) || (tab.type === 'table-viewer' && dirtyTabs.has(tab.id))
+
+  /** Close one tab, confirming first if it has unsaved changes. */
+  function requestClose(id: string): void {
+    const tab = tabs.find((t) => t.id === id)
+    if (tab && tabUnsaved(tab)) {
+      setConfirm({ count: 1, run: () => closeTab(id) })
+    } else {
+      closeTab(id)
+    }
+  }
 
   function onDrop(e: DragEvent, index: number): void {
     e.preventDefault()
@@ -63,7 +78,7 @@ export function TabBar() {
     }
     const unsaved = ids.filter((id) => {
       const t = tabs.find((x) => x.id === id)
-      return t ? isUnsaved(t) : false
+      return t ? tabUnsaved(t) : false
     }).length
     if (unsaved > 0) setConfirm({ count: unsaved, run })
     else run()
@@ -125,7 +140,7 @@ export function TabBar() {
             onAuxClick={(e) => {
               if (e.button === 1) {
                 e.preventDefault()
-                closeTab(tab.id)
+                requestClose(tab.id)
               }
             }}
             onKeyDown={(e) => onKeyDown(e, tab.id)}
@@ -138,7 +153,7 @@ export function TabBar() {
               aria-label={`Close ${tab.title}`}
               onClick={(e) => {
                 e.stopPropagation()
-                closeTab(tab.id)
+                requestClose(tab.id)
               }}
             >
               <IconX size={12} />

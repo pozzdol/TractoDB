@@ -43,7 +43,17 @@ interface DataGridProps {
   onEditCommit?: (row: Row, column: string, value: string) => void
   /** Bare table name, for "Copy row as SQL INSERT". */
   tableName?: string
+  /** Selection changes, resolved to row objects (sort-independent). */
+  onSelectionChange?: (rows: Row[], cells: { row: Row; colKey: string }[]) => void
+  /** Extra controls injected at the left of the grid toolbar (row operations). */
+  toolbarExtra?: ReactNode
+  /** Ctrl+C / Ctrl+V within the grid. */
+  onCopy?: () => void
+  onPaste?: () => void
 }
+
+// Per-row marker (Table Viewer staged changes): read from row['__state'].
+type RowMarker = 'new' | 'modified' | 'deleted'
 
 interface SortState {
   column: string
@@ -89,6 +99,10 @@ export function DataGrid({
   editable = false,
   onEditCommit,
   tableName,
+  onSelectionChange,
+  toolbarExtra,
+  onCopy,
+  onPaste,
 }: DataGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -177,9 +191,17 @@ export function DataGrid({
   }
 
   function onGridKeyDown(e: KeyboardEvent): void {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const k = e.key.toLowerCase()
+    if (k === 'a') {
       e.preventDefault()
       setSelectedRows(new Set(sortedRows.map((_, i) => i)))
+    } else if (k === 'c' && onCopy) {
+      e.preventDefault()
+      onCopy()
+    } else if (k === 'v' && onPaste) {
+      e.preventDefault()
+      onPaste()
     }
   }
 
@@ -245,6 +267,22 @@ export function DataGrid({
   const start = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN)
   const end = Math.min(total, start + Math.ceil(viewport / rowHeight) + OVERSCAN * 2)
   const visible = sortedRows.slice(start, end)
+
+  // Report selection as row objects (carry __rowId), so consumers are sort-independent.
+  useEffect(() => {
+    if (!onSelectionChange) return
+    const rowsSel = [...selectedRows]
+      .map((i) => sortedRows[i])
+      .filter((r): r is Row => r !== undefined)
+    const cellsSel = [...selectedCells]
+      .map((key) => {
+        const sep = key.indexOf(':')
+        const row = sortedRows[Number(key.slice(0, sep))]
+        return row ? { row, colKey: key.slice(sep + 1) } : null
+      })
+      .filter((c): c is { row: Row; colKey: string } => c !== null)
+    onSelectionChange(rowsSel, cellsSel)
+  }, [selectedRows, selectedCells, sortedRows, onSelectionChange])
 
   function toggleSort(column: string): void {
     setSort((prev) =>
@@ -377,6 +415,7 @@ export function DataGrid({
   return (
     <div className={styles.gridWrap}>
       <div className={styles.toolbar}>
+        {toolbarExtra}
         <span
           className={styles.rowGrip}
           title="Drag to resize row height"
@@ -459,15 +498,25 @@ export function DataGrid({
             {visible.map((row, i) => {
               const index = start + i
               const rowSelected = selectedRows.has(index)
+              const marker = row['__state'] as RowMarker | undefined
+              const markClass =
+                marker === 'new'
+                  ? styles.markNew
+                  : marker === 'modified'
+                    ? styles.markModified
+                    : marker === 'deleted'
+                      ? styles.markDeleted
+                      : ''
               return (
                 <tr
                   key={index}
+                  className={marker === 'deleted' ? styles.rowDeleted : undefined}
                   style={{ height: rowHeight, background: rowBackground(index) }}
                   onMouseEnter={() => setHoveredRow(index)}
                   onMouseLeave={() => setHoveredRow((prev) => (prev === index ? null : prev))}
                 >
                   <td
-                    className={`${styles.rowNum} ${rowSelected ? styles.rowNumActive : ''}`}
+                    className={`${styles.rowNum} ${markClass} ${rowSelected ? styles.rowNumActive : ''}`}
                     onClick={(e) => onRowNumClick(e, index)}
                   >
                     {index + 1}
@@ -506,7 +555,8 @@ export function DataGrid({
                             onKeyDown={(e) => onEditKey(e, col.name, row)}
                           />
                         ) : isNull ? (
-                          'null'
+                          // Staged new rows show unset cells as empty (spec 2B), not "null".
+                          marker === 'new' ? '' : 'null'
                         ) : (
                           cellText(value)
                         )}

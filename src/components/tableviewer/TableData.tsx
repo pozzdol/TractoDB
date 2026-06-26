@@ -1,45 +1,141 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  IconAlertTriangle,
+  IconClipboard,
+  IconClipboardCheck,
+  IconCopy,
+  IconRowInsertBottom,
+  IconTrash,
+} from '@tabler/icons-react'
 import { DataGrid } from '@/components/grid/DataGrid'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { api } from '@/store/ipcClient'
+import { useTabStore } from '@/store/tabStore'
 import { qualifiedName, quoteIdent } from '@/lib/sqlIdent'
+import type { DatabaseType } from '@/types/connection'
 import type { QueryColumn } from '@/types/query'
 import type { TableTabProps } from './TableViewer'
 import styles from './TableData.module.css'
 
 type Row = Record<string, unknown>
-const PAGE = 100
+type RowState = 'new' | 'modified' | 'deleted' | 'unchanged'
 
-interface PendingEdit {
-  row: Row
-  column: string
-  value: string
-  sql: string
+interface EditRow {
+  rowId: string
+  original: Row | null // null for new rows
+  current: Row
+  state: RowState
 }
 
-export function TableData({ connectionId, database, schema, table, dbType, readOnly }: TableTabProps) {
+const PAGE = 100
+let tmpCounter = 0
+function tmpId(): string {
+  tmpCounter += 1
+  return `new:${tmpCounter}`
+}
+
+// ─── SQL generation ───────────────────────────────────────────────────────────
+function literal(v: unknown): string {
+  if (v === null || v === undefined) return 'NULL'
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  return `'${String(v).replace(/'/g, "''")}'`
+}
+
+function valEq(a: unknown, b: unknown): boolean {
+  if ((a === null || a === undefined) && (b === null || b === undefined)) return true
+  return String(a) === String(b)
+}
+
+function buildStatements(
+  editRows: EditRow[],
+  columns: QueryColumn[],
+  pkColumn: string | null,
+  qualified: string,
+  dbType: DatabaseType,
+): string[] {
+  const qid = (c: string): string => quoteIdent(dbType, c)
+  const names = columns.map((c) => c.name)
+  const stmts: string[] = []
+  // a. INSERTs
+  for (const er of editRows) {
+    if (er.state !== 'new') continue
+    const cols = names.filter((c) => er.current[c] !== undefined)
+    if (cols.length === 0) continue
+    stmts.push(
+      `INSERT INTO ${qualified} (${cols.map(qid).join(', ')}) VALUES (${cols
+        .map((c) => literal(er.current[c]))
+        .join(', ')});`,
+    )
+  }
+  // b. UPDATEs (only changed columns)
+  if (pkColumn) {
+    for (const er of editRows) {
+      if (er.state !== 'modified' || !er.original) continue
+      const changed = names.filter((c) => !valEq(er.current[c], er.original?.[c]))
+      if (changed.length === 0) continue
+      const set = changed.map((c) => `${qid(c)} = ${literal(er.current[c])}`).join(', ')
+      stmts.push(`UPDATE ${qualified} SET ${set} WHERE ${qid(pkColumn)} = ${literal(er.original[pkColumn])};`)
+    }
+    // c. DELETEs
+    for (const er of editRows) {
+      if (er.state !== 'deleted' || !er.original) continue
+      stmts.push(`DELETE FROM ${qualified} WHERE ${qid(pkColumn)} = ${literal(er.original[pkColumn])};`)
+    }
+  }
+  return stmts
+}
+
+function countByState(editRows: EditRow[]): { modified: number; new: number; deleted: number } {
+  return {
+    modified: editRows.filter((r) => r.state === 'modified').length,
+    new: editRows.filter((r) => r.state === 'new').length,
+    deleted: editRows.filter((r) => r.state === 'deleted').length,
+  }
+}
+
+function dirtySummary(c: { modified: number; new: number; deleted: number }): string {
+  const parts: string[] = []
+  if (c.new) parts.push(`${c.new} new`)
+  if (c.modified) parts.push(`${c.modified} modified`)
+  if (c.deleted) parts.push(`${c.deleted} deleted`)
+  return parts.join(', ')
+}
+
+export function TableData({ tabId, connectionId, database, schema, table, dbType, readOnly }: TableTabProps) {
   const qualified = qualifiedName(dbType, schema, table)
+  const setTabDirty = useTabStore((s) => s.setTabDirty)
 
   const [columns, setColumns] = useState<QueryColumn[]>([])
-  const [rows, setRows] = useState<Row[]>([])
+  const [editRows, setEditRows] = useState<EditRow[]>([])
   const [pkColumn, setPkColumn] = useState<string | null>(null)
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState<PendingEdit | null>(null)
+
+  // Selection mirrored from the grid (row objects carry __rowId).
+  const [selRows, setSelRows] = useState<Row[]>([])
+  const [selCells, setSelCells] = useState<{ row: Row; colKey: string }[]>([])
+
+  // Dialogs
+  const [review, setReview] = useState<string[] | null>(null) // statements being reviewed
+  const [execError, setExecError] = useState<{ stmt: string; message: string } | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const editable = !readOnly && pkColumn !== null
+  const counts = useMemo(() => countByState(editRows), [editRows])
+  const isDirty = counts.new + counts.modified + counts.deleted > 0
+
+  function rowIdOf(dbRow: Row, idx: number): string {
+    return pkColumn != null && dbRow[pkColumn] != null ? `pk:${String(dbRow[pkColumn])}` : `idx:${idx}`
+  }
 
   const loadPage = useCallback(
     async (offset: number) => {
-      const res = await api().query.execute(
-        connectionId,
-        `SELECT * FROM ${qualified}`,
-        database,
-        offset,
-        PAGE,
-      )
+      const res = await api().query.execute(connectionId, `SELECT * FROM ${qualified}`, database, offset, PAGE)
       if (!res.success) {
         setError(res.error)
         return
@@ -48,112 +144,432 @@ export function TableData({ connectionId, database, schema, table, dbType, readO
       setColumns(data.columns)
       setTotalCount(data.totalCount)
       setHasMore(Boolean(data.hasMore))
-      setRows((prev) => (offset === 0 ? data.rows : [...prev, ...data.rows]))
+      setEditRows((prev) => {
+        const fresh = data.rows.map(
+          (r, i): EditRow => ({ rowId: rowIdOf(r, offset + i), original: r, current: r, state: 'unchanged' }),
+        )
+        return offset === 0 ? fresh : [...prev, ...fresh]
+      })
     },
-    [connectionId, qualified, database],
+    // rowIdOf depends on pkColumn; intentionally re-create loadPage when pk known
+    [connectionId, qualified, database, pkColumn],
   )
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    setEditRows([])
+    const cols = await api().schema.listColumns(connectionId, database, schema ? `${schema}.${table}` : table)
+    if (cols.success) setPkColumn(cols.data.find((c) => c.isPrimaryKey)?.name ?? null)
+    await loadPage(0)
+    setLoading(false)
+  }, [connectionId, database, schema, table, loadPage])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
-    setRows([])
     void (async () => {
+      setLoading(true)
+      setError(null)
+      setEditRows([])
       const cols = await api().schema.listColumns(connectionId, database, schema ? `${schema}.${table}` : table)
-      if (!cancelled && cols.success) {
-        setPkColumn(cols.data.find((c) => c.isPrimaryKey)?.name ?? null)
+      if (cancelled) return
+      const pk = cols.success ? (cols.data.find((c) => c.isPrimaryKey)?.name ?? null) : null
+      setPkColumn(pk)
+      const res = await api().query.execute(connectionId, `SELECT * FROM ${qualified}`, database, 0, PAGE)
+      if (cancelled) return
+      if (!res.success) {
+        setError(res.error)
+        setLoading(false)
+        return
       }
-      await loadPage(0)
-      if (!cancelled) setLoading(false)
+      setColumns(res.data.columns)
+      setTotalCount(res.data.totalCount)
+      setHasMore(Boolean(res.data.hasMore))
+      setEditRows(
+        res.data.rows.map((r, i): EditRow => ({
+          rowId: pk != null && r[pk] != null ? `pk:${String(r[pk])}` : `idx:${i}`,
+          original: r,
+          current: r,
+          state: 'unchanged',
+        })),
+      )
+      setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [connectionId, database, schema, table, loadPage])
+  }, [connectionId, database, schema, table, qualified])
+
+  // Report dirty state to the tab store (close protection); clear on unmount.
+  useEffect(() => {
+    setTabDirty(tabId, isDirty)
+  }, [tabId, isDirty, setTabDirty])
+  useEffect(() => () => setTabDirty(tabId, false), [tabId, setTabDirty])
 
   async function loadMore(): Promise<void> {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    await loadPage(rows.length)
+    await loadPage(editRows.filter((r) => r.state !== 'new').length)
     setLoadingMore(false)
   }
 
-  function requestEdit(row: Row, column: string, value: string): void {
-    if (!pkColumn) return
-    const pkVal = row[pkColumn]
-    const lit = typeof pkVal === 'number' ? String(pkVal) : `'${String(pkVal)}'`
-    const sql = `UPDATE ${qualified} SET ${quoteIdent(dbType, column)} = '${value}' WHERE ${quoteIdent(dbType, pkColumn)} = ${lit}`
-    setPending({ row, column, value, sql })
+  // ── Display rows for the grid (carry __rowId + __state) ─────────────────────
+  const displayRows = useMemo(
+    () => editRows.map((er) => ({ ...er.current, __rowId: er.rowId, __state: er.state })),
+    [editRows],
+  )
+  const indexByRowId = useMemo(() => {
+    const m = new Map<string, number>()
+    editRows.forEach((er, i) => m.set(er.rowId, i))
+    return m
+  }, [editRows])
+
+  // ── Inline edit → stage ──────────────────────────────────────────────────────
+  function onEditCommit(row: Row, column: string, value: string): void {
+    const rowId = row['__rowId'] as string
+    setEditRows((rows) =>
+      rows.map((er) => {
+        if (er.rowId !== rowId || er.state === 'deleted') return er
+        const current = { ...er.current, [column]: value }
+        const state: RowState = er.state === 'new' ? 'new' : 'modified'
+        return { ...er, current, state }
+      }),
+    )
   }
 
-  async function confirmEdit(): Promise<void> {
-    if (!pending || !pkColumn) return
-    const { row, column, value } = pending
-    const res = await api().table.updateCell({
-      connectionId,
-      database,
-      schema,
-      table,
-      pkColumn,
-      pkValue: row[pkColumn],
-      column,
-      value,
+  // ── Row operations ─────────────────────────────────────────────────────────
+  function addRow(): void {
+    setEditRows((rows) => [...rows, { rowId: tmpId(), original: null, current: {}, state: 'new' }])
+  }
+
+  function duplicateRows(): void {
+    const ids = new Set(selRows.map((r) => r['__rowId'] as string))
+    if (ids.size === 0) return
+    setEditRows((rows) => {
+      const out: EditRow[] = []
+      for (const er of rows) {
+        out.push(er)
+        if (ids.has(er.rowId)) {
+          const current = { ...er.current }
+          if (pkColumn) current[pkColumn] = undefined // clear PK — DB regenerates
+          out.push({ rowId: tmpId(), original: null, current, state: 'new' })
+        }
+      }
+      return out
     })
-    setPending(null)
-    if (!res.success) {
-      setError(res.error)
+  }
+
+  function deleteRows(): void {
+    const ids = new Set(selRows.map((r) => r['__rowId'] as string))
+    if (ids.size === 0) return
+    setEditRows((rows) =>
+      rows
+        .map((er) => (ids.has(er.rowId) && er.state !== 'new' ? { ...er, state: 'deleted' as RowState } : er))
+        .filter((er) => !(ids.has(er.rowId) && er.state === 'new')),
+    )
+  }
+
+  // ── Copy / Paste (TSV, Excel-style) ──────────────────────────────────────────
+  function handleCopy(): void {
+    const names = columns.map((c) => c.name)
+    let tsv = ''
+    if (selCells.length > 0) {
+      // bounding box over selected cells
+      const rIdx = selCells.map((c) => indexByRowId.get(c.row['__rowId'] as string) ?? -1).filter((n) => n >= 0)
+      const cIdx = selCells.map((c) => names.indexOf(c.colKey)).filter((n) => n >= 0)
+      const rLo = Math.min(...rIdx)
+      const rHi = Math.max(...rIdx)
+      const cLo = Math.min(...cIdx)
+      const cHi = Math.max(...cIdx)
+      const lines: string[] = []
+      for (let r = rLo; r <= rHi; r++) {
+        const cells: string[] = []
+        for (let c = cLo; c <= cHi; c++) cells.push(String(editRows[r]?.current[names[c] ?? ''] ?? ''))
+        lines.push(cells.join('\t'))
+      }
+      tsv = lines.join('\n')
+    } else if (selRows.length > 0) {
+      const ids = selRows
+        .map((r) => indexByRowId.get(r['__rowId'] as string) ?? -1)
+        .filter((n) => n >= 0)
+        .sort((a, b) => a - b)
+      const lines = [names.join('\t')]
+      for (const i of ids) lines.push(names.map((n) => String(editRows[i]?.current[n] ?? '')).join('\t'))
+      tsv = lines.join('\n')
+    } else {
       return
     }
-    setRows((rs) => rs.map((r) => (r === row ? { ...r, [column]: value } : r)))
+    void navigator.clipboard.writeText(tsv)
+    setToast('Copied to clipboard')
   }
+
+  async function handlePaste(): Promise<void> {
+    if (!editable) return
+    let text = ''
+    try {
+      text = await navigator.clipboard.readText()
+    } catch {
+      return
+    }
+    if (!text) return
+    const names = columns.map((c) => c.name)
+    let grid = text.replace(/\r/g, '').split('\n').filter((l) => l.length > 0).map((l) => l.split('\t'))
+    if (grid.length === 0) return
+    // drop a header row if it matches column names
+    const first = grid[0] ?? []
+    if (first.length > 0 && first.every((h) => names.some((n) => n.toLowerCase() === h.trim().toLowerCase()))) {
+      grid = grid.slice(1)
+    }
+    if (grid.length === 0) return
+
+    const anchor = selCells.length === 1 ? selCells[0] : null
+    if (anchor) {
+      const aRow = indexByRowId.get(anchor.row['__rowId'] as string) ?? 0
+      const aCol = Math.max(0, names.indexOf(anchor.colKey))
+      setEditRows((rows) => {
+        const out = [...rows]
+        grid.forEach((line, r) => {
+          const target = aRow + r
+          if (target < out.length) {
+            const er = out[target]
+            if (!er) return
+            const current = { ...er.current }
+            line.forEach((val, c) => {
+              const col = names[aCol + c]
+              if (col) current[col] = val
+            })
+            out[target] = { ...er, current, state: er.state === 'new' ? 'new' : 'modified' }
+          } else {
+            const current: Row = {}
+            line.forEach((val, c) => {
+              const col = names[aCol + c]
+              if (col) current[col] = val
+            })
+            out.push({ rowId: tmpId(), original: null, current, state: 'new' })
+          }
+        })
+        return out
+      })
+    } else {
+      // append as new rows, mapping columns left-to-right
+      setEditRows((rows) => [
+        ...rows,
+        ...grid.map((line): EditRow => {
+          const current: Row = {}
+          line.forEach((val, c) => {
+            const col = names[c]
+            if (col) current[col] = val
+          })
+          return { rowId: tmpId(), original: null, current, state: 'new' }
+        }),
+      ])
+    }
+    setToast(`Pasted ${grid.length} row${grid.length === 1 ? '' : 's'}`)
+  }
+
+  // ── Save / Cancel ────────────────────────────────────────────────────────────
+  function openReview(): void {
+    setExecError(null)
+    setReview(buildStatements(editRows, columns, pkColumn, qualified, dbType))
+  }
+
+  async function executeAll(): Promise<void> {
+    if (!review) return
+    setExecError(null)
+    // Best-effort transaction on the connection's single client.
+    await api().query.execute(connectionId, 'BEGIN', database).catch(() => undefined)
+    for (const stmt of review) {
+      const res = await api().query.execute(connectionId, stmt, database)
+      if (!res.success) {
+        await api().query.execute(connectionId, 'ROLLBACK', database).catch(() => undefined)
+        setExecError({ stmt, message: res.error })
+        return // leave staged rows intact
+      }
+    }
+    await api().query.execute(connectionId, 'COMMIT', database).catch(() => undefined)
+    setReview(null)
+    setToast('Changes saved')
+    await reload()
+  }
+
+  function discardChanges(): void {
+    setConfirmCancel(false)
+    void reload()
+  }
+
+  // ── Selection mirror (stable callback) ───────────────────────────────────────
+  const onSelectionChange = useCallback(
+    (rows: Row[], cells: { row: Row; colKey: string }[]) => {
+      setSelRows(rows)
+      setSelCells(cells)
+    },
+    [],
+  )
 
   if (loading) return <div className={styles.message}>Loading…</div>
   if (error) return <div className={styles.error}>{error}</div>
 
+  const loadedCount = editRows.filter((r) => r.state !== 'new').length
+  const toolbar = (
+    <div className={styles.ops}>
+      <Button variant="ghost" className={styles.opBtn} title="Add row" aria-label="Add row" disabled={!editable} onClick={addRow}>
+        <IconRowInsertBottom size={14} /> Add
+      </Button>
+      <Button
+        variant="ghost"
+        className={styles.opBtn}
+        title="Duplicate selected rows"
+        aria-label="Duplicate rows"
+        disabled={!editable || selRows.length === 0}
+        onClick={duplicateRows}
+      >
+        <IconCopy size={14} /> Duplicate
+      </Button>
+      <Button
+        variant="ghost"
+        className={styles.opBtn}
+        title="Delete selected rows"
+        aria-label="Delete rows"
+        disabled={!editable || selRows.length === 0}
+        onClick={deleteRows}
+      >
+        <IconTrash size={14} /> Delete{selRows.length > 0 ? ` (${selRows.length})` : ''}
+      </Button>
+      <span className={styles.opSep} />
+      <Button
+        variant="ghost"
+        className={styles.opBtn}
+        title="Copy selection"
+        aria-label="Copy"
+        disabled={selRows.length === 0 && selCells.length === 0}
+        onClick={handleCopy}
+      >
+        <IconClipboard size={14} /> Copy
+      </Button>
+      <Button
+        variant="ghost"
+        className={styles.opBtn}
+        title="Paste"
+        aria-label="Paste"
+        disabled={!editable}
+        onClick={() => void handlePaste()}
+      >
+        <IconClipboardCheck size={14} /> Paste
+      </Button>
+    </div>
+  )
+
   return (
     <div className={styles.wrap}>
+      {isDirty ? (
+        <div className={styles.saveBar} role="status">
+          <span className={styles.saveMsg}>
+            <IconAlertTriangle size={14} />
+            {counts.new + counts.modified + counts.deleted} unsaved change
+            {counts.new + counts.modified + counts.deleted === 1 ? '' : 's'} ({dirtySummary(counts)})
+          </span>
+          <span className={styles.spacer} />
+          <Button variant="secondary" onClick={() => setConfirmCancel(true)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={openReview}>
+            Save
+          </Button>
+        </div>
+      ) : null}
+
       <div className={styles.statusBar}>
         {totalCount !== undefined
           ? hasMore
-            ? `Showing ${rows.length} of ${totalCount.toLocaleString()} rows`
-            : `All ${totalCount.toLocaleString()} rows loaded`
-          : `${rows.length} rows`}
+            ? `Showing ${loadedCount} of ${totalCount.toLocaleString()} rows`
+            : `${editRows.length.toLocaleString()} rows`
+          : `${editRows.length} rows`}
         {readOnly ? <span className={styles.ro}>read-only</span> : null}
-        {!readOnly && !pkColumn ? (
-          <span className={styles.ro}>no primary key — editing disabled</span>
-        ) : null}
+        {!readOnly && !pkColumn ? <span className={styles.ro}>no primary key — editing disabled</span> : null}
       </div>
+
       <DataGrid
         columns={columns}
-        rows={rows}
+        rows={displayRows}
         gridKey={`${connectionId}/${database}/${schema ? `${schema}.` : ''}${table}`}
         hasMore={hasMore}
         isLoadingMore={loadingMore}
         onLoadMore={() => void loadMore()}
-        editable={!readOnly && pkColumn !== null}
-        onEditCommit={(row, column, value) => requestEdit(row, column, value)}
+        editable={editable}
+        onEditCommit={onEditCommit}
         tableName={qualified}
+        onSelectionChange={onSelectionChange}
+        toolbarExtra={toolbar}
+        onCopy={handleCopy}
+        onPaste={() => void handlePaste()}
       />
-      {pending ? (
+
+      {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
+
+      {review ? (
         <Modal
-          title="Confirm update"
-          size="md"
-          onClose={() => setPending(null)}
+          title="Review Changes"
+          size="lg"
+          onClose={() => setReview(null)}
           footer={
             <>
-              <Button variant="secondary" onClick={() => setPending(null)}>
+              <Button variant="secondary" onClick={() => setReview(null)}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={() => void confirmEdit()}>
-                Update
+              <Button variant="primary" onClick={() => void executeAll()}>
+                Execute All
               </Button>
             </>
           }
         >
-          <p className={styles.confirmText}>Run this statement?</p>
-          <pre className={styles.confirmSql}>{pending.sql}</pre>
+          {review.length === 0 ? (
+            <p className={styles.message}>No statements to execute.</p>
+          ) : (
+            <pre className={styles.reviewSql}>
+              {review.map((s, i) => (
+                <div
+                  key={i}
+                  className={execError?.stmt === s ? styles.failStmt : undefined}
+                >
+                  {s}
+                </div>
+              ))}
+            </pre>
+          )}
+          {execError ? <p className={styles.error}>Error: {execError.message}</p> : null}
+        </Modal>
+      ) : null}
+
+      {confirmCancel ? (
+        <Modal
+          title="Discard changes"
+          size="sm"
+          onClose={() => setConfirmCancel(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmCancel(false)}>
+                Keep Editing
+              </Button>
+              <Button variant="danger" onClick={discardChanges}>
+                Discard Changes
+              </Button>
+            </>
+          }
+        >
+          <p>
+            Discard {counts.new + counts.modified + counts.deleted} unsaved change
+            {counts.new + counts.modified + counts.deleted === 1 ? '' : 's'}? This cannot be undone.
+          </p>
         </Modal>
       ) : null}
     </div>
   )
+}
+
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2200)
+    return () => clearTimeout(t)
+  }, [onDone])
+  return <div className={styles.toast}>{message}</div>
 }

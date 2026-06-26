@@ -103,6 +103,8 @@ interface OpenTableOptions {
 export interface TabStore {
   tabs: Tab[]
   activeTabId: string | null
+  /** Table-viewer tabs with unsaved staged edits (Feature 3 close protection). */
+  dirtyTabs: Set<string>
 
   openQueryTab: (options?: OpenQueryOptions) => string
   openTableTab: (options: OpenTableOptions) => string
@@ -111,6 +113,7 @@ export interface TabStore {
   updateQuerySql: (id: string, sql: string) => void
   setTabTitle: (id: string, title: string) => void
   reorderTabs: (fromIndex: number, toIndex: number) => void
+  setTabDirty: (id: string, dirty: boolean) => void
   /** Restore tabs persisted in layout.json (called once on app start). */
   restore: () => Promise<void>
 }
@@ -118,6 +121,7 @@ export interface TabStore {
 export const useTabStore = create<TabStore>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  dirtyTabs: new Set(),
 
   openQueryTab(options = {}) {
     const id = newId()
@@ -171,7 +175,22 @@ export const useTabStore = create<TabStore>((set, get) => ({
         const neighbour = tabs[index] ?? tabs[index - 1] ?? null
         activeTabId = neighbour ? neighbour.id : null
       }
-      return { tabs, activeTabId }
+      let dirtyTabs = s.dirtyTabs
+      if (dirtyTabs.has(id)) {
+        dirtyTabs = new Set(dirtyTabs)
+        dirtyTabs.delete(id)
+      }
+      return { tabs, activeTabId, dirtyTabs }
+    })
+  },
+
+  setTabDirty(id, dirty) {
+    set((s) => {
+      if (dirty === s.dirtyTabs.has(id)) return s
+      const dirtyTabs = new Set(s.dirtyTabs)
+      if (dirty) dirtyTabs.add(id)
+      else dirtyTabs.delete(id)
+      return { dirtyTabs }
     })
   },
 
