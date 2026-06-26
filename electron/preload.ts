@@ -1,13 +1,18 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webFrame } from 'electron'
 import { IPC } from '../shared/ipc'
-import type { BackupProgress, DbStudioApi, MenuAction } from '../shared/ipc'
+import type { BackupProgress, TractoDbApi, MenuAction } from '../shared/ipc'
+
+type MaximizedListener = (event: Electron.IpcRendererEvent, value: boolean) => void
+// Track wrapper listeners so off*() can remove the right one.
+const maxListeners = new WeakMap<(v: boolean) => void, MaximizedListener>()
+const fsListeners = new WeakMap<(v: boolean) => void, MaximizedListener>()
 
 /**
  * The contextBridge surface. The renderer reaches the main process ONLY through
  * `window.tractodb.*` — never `ipcRenderer` or Node APIs directly. Each method
  * forwards to `ipcRenderer.invoke` and resolves with an `IpcResponse<T>`.
  */
-const api: DbStudioApi = {
+const api: TractoDbApi = {
   connection: {
     connect: (config) => ipcRenderer.invoke(IPC.CONNECTION.CONNECT, config),
     disconnect: (id) => ipcRenderer.invoke(IPC.CONNECTION.DISCONNECT, id),
@@ -79,6 +84,35 @@ const api: DbStudioApi = {
       ipcRenderer.on(IPC.MENU.ACTION, listener)
       return () => ipcRenderer.removeListener(IPC.MENU.ACTION, listener)
     },
+  },
+  platform: () => process.platform,
+  windowControls: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
+    close: () => ipcRenderer.send('window:close'),
+    isMaximized: () => ipcRenderer.sendSync('window:isMaximized') as boolean,
+    onMaximized: (cb) => {
+      const l: MaximizedListener = (_e, v) => cb(v)
+      maxListeners.set(cb, l)
+      ipcRenderer.on('window:maximized', l)
+    },
+    offMaximized: (cb) => {
+      const l = maxListeners.get(cb)
+      if (l) ipcRenderer.removeListener('window:maximized', l)
+    },
+    onFullscreen: (cb) => {
+      const l: MaximizedListener = (_e, v) => cb(v)
+      fsListeners.set(cb, l)
+      ipcRenderer.on('window:fullscreen', l)
+    },
+    offFullscreen: (cb) => {
+      const l = fsListeners.get(cb)
+      if (l) ipcRenderer.removeListener('window:fullscreen', l)
+    },
+    toggleFullscreen: () => ipcRenderer.send('window:toggleFullscreen'),
+    zoomIn: () => webFrame.setZoomLevel(webFrame.getZoomLevel() + 0.5),
+    zoomOut: () => webFrame.setZoomLevel(webFrame.getZoomLevel() - 0.5),
+    zoomReset: () => webFrame.setZoomLevel(0),
   },
 }
 

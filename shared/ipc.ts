@@ -485,7 +485,7 @@ export function ipcError(error: string, code?: string): IpcError {
 // forwarding each method to `ipcRenderer.invoke(<channel>, ...args)`; main-process
 // handlers (registered in electron/ipc/) resolve them with an IpcResponse.
 
-export interface DbStudioApi {
+export interface TractoDbApi {
   connection: {
     connect(config: ConnectionConfig): Promise<IpcResponse<ActiveConnection>>
     disconnect(id: string): Promise<IpcResponse<void>>
@@ -559,6 +559,22 @@ export interface DbStudioApi {
     /** Subscribe to native-menu actions. Returns an unsubscribe function. */
     onAction(callback: (action: MenuAction) => void): () => void
   }
+  /** Host platform: 'darwin' | 'linux' | 'win32' (from process.platform). */
+  platform(): NodeJS.Platform
+  windowControls: {
+    minimize(): void
+    maximize(): void
+    close(): void
+    isMaximized(): boolean
+    onMaximized(cb: (value: boolean) => void): void
+    offMaximized(cb: (value: boolean) => void): void
+    onFullscreen(cb: (value: boolean) => void): void
+    offFullscreen(cb: (value: boolean) => void): void
+    toggleFullscreen(): void
+    zoomIn(): void
+    zoomOut(): void
+    zoomReset(): void
+  }
 }
 
 /** Actions emitted by the native application menu. */
@@ -566,6 +582,6 @@ export type MenuAction = 'backup' | 'restore'
 
 declare global {
   interface Window {
-    tractodb: DbStudioApi
+    tractodb: TractoDbApi
   }
 }

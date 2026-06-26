@@ -63,14 +63,35 @@ export default function App() {
     void useTabStore.getState().restore()
   }, [hydrate])
 
-  // Global tab shortcuts: Ctrl/Cmd+T new query, Ctrl/Cmd+W close active tab.
+  // Global keyboard shortcuts (mirrors the title bar menu accelerators).
   useEffect(() => {
+    const wc = window.tractodb.windowControls
     function onKey(e: KeyboardEvent): void {
+      if (e.key === 'F11') {
+        e.preventDefault()
+        wc.toggleFullscreen()
+        return
+      }
       if (!e.ctrlKey && !e.metaKey) return
       const key = e.key.toLowerCase()
       if (key === ',') {
         e.preventDefault()
         useUiStore.getState().openPreferences()
+      } else if (key === 'b') {
+        e.preventDefault()
+        useUiStore.getState().toggleSidebar()
+      } else if (key === 'q') {
+        e.preventDefault()
+        wc.close()
+      } else if (key === '=' || key === '+') {
+        e.preventDefault()
+        wc.zoomIn()
+      } else if (key === '-') {
+        e.preventDefault()
+        wc.zoomOut()
+      } else if (key === '0') {
+        e.preventDefault()
+        wc.zoomReset()
       } else if (key === 't') {
         e.preventDefault()
         useTabStore.getState().openQueryTab({

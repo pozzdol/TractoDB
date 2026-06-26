@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
 import path from 'node:path'
 import { IPC, type MenuAction } from '../shared/ipc'
 import { registerIpcHandlers } from './ipc'
@@ -33,6 +33,27 @@ function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+/** Frameless window controls driven by the custom title bar (Linux/Windows). */
+function registerWindowControls(): void {
+  const winOf = (e: Electron.IpcMainEvent): BrowserWindow | null =>
+    BrowserWindow.fromWebContents(e.sender)
+  ipcMain.on('window:minimize', (e) => winOf(e)?.minimize())
+  ipcMain.on('window:maximize', (e) => {
+    const win = winOf(e)
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+  })
+  ipcMain.on('window:close', (e) => winOf(e)?.close())
+  ipcMain.on('window:toggleFullscreen', (e) => {
+    const win = winOf(e)
+    if (win) win.setFullScreen(!win.isFullScreen())
+  })
+  ipcMain.on('window:isMaximized', (e) => {
+    e.returnValue = winOf(e)?.isMaximized() ?? false
+  })
+}
+
 // vite-plugin-electron injects this in dev; undefined in a packaged build.
 const DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
@@ -42,14 +63,16 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 880,
-    minHeight: 560,
+    minWidth: 900,
+    minHeight: 600,
     show: false,
     title: 'TractoDB',
-    // Matches the light-theme --color-bg-primary so there's no white flash on
-    // load. Phase 11 will sync this with the persisted theme preference.
-    backgroundColor: '#ffffff',
-    autoHideMenuBar: true,
+    // Frameless — the renderer draws a custom VS Code-style title bar.
+    frame: false,
+    titleBarStyle: 'hidden', // keeps macOS traffic lights, hides native title
+    transparent: false,
+    // Dark default avoids a white flash before the theme applies.
+    backgroundColor: '#1E1E1E',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // Security: renderer never gets Node. Everything crosses via the
@@ -59,6 +82,17 @@ function createWindow(): void {
       sandbox: true,
     },
   })
+
+  // macOS: keep the native traffic lights visible over our frameless chrome.
+  if (process.platform === 'darwin') {
+    mainWindow.setWindowButtonVisibility(true)
+  }
+
+  const win = mainWindow
+  win.on('maximize', () => win.webContents.send('window:maximized', true))
+  win.on('unmaximize', () => win.webContents.send('window:maximized', false))
+  win.on('enter-full-screen', () => win.webContents.send('window:fullscreen', true))
+  win.on('leave-full-screen', () => win.webContents.send('window:fullscreen', false))
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
@@ -81,6 +115,7 @@ app
   .then(async () => {
     await runStartupMigrations() // DBStudio → TractoDB data migration (one-time)
     registerIpcHandlers()
+    registerWindowControls()
     buildMenu()
     createWindow()
 

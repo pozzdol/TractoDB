@@ -1,61 +1,124 @@
 .bar {
+  flex: 0 0 var(--titlebar-height);
   display: flex;
   align-items: center;
-  gap: var(--space-4);
   height: var(--titlebar-height);
-  flex: 0 0 var(--titlebar-height);
-  padding: 0 var(--space-6);
   background-color: var(--color-bg-secondary);
   border-bottom: var(--border);
-  /* Electron frameless drag region (harmless when the OS frame is used). */
+  /* Entire bar drags the window; interactive children opt out below. */
   -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
 }
 
-.left,
-.right {
+/* macOS traffic-light reservation. */
+.macPad {
+  flex: 0 0 72px;
+}
+
+.brand {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Buttons must stay clickable inside the drag region. */
-  -webkit-app-region: no-drag;
-}
-
-.left {
+  padding-left: var(--space-4);
   flex: 0 0 auto;
 }
 
-.right {
-  flex: 0 0 auto;
+.appIcon {
+  color: var(--color-accent);
 }
 
-.center {
-  flex: 1 1 auto;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-
-.wordmark {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.01em;
-  color: var(--color-text-primary);
-  margin-right: var(--space-2);
-}
-
-.connection,
-.connectionMuted {
+.appName {
   font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  margin-right: var(--space-4);
 }
 
-.connection {
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sep {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.crumb,
+.crumbName {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.crumbName {
   color: var(--color-text-secondary);
 }
 
-.connectionMuted {
-  color: var(--color-text-tertiary);
+/* ─── Inline menu bar ─────────────────────────────────────────────────────── */
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-6);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.menuItem {
+  height: 28px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.menuItem:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.menuActive {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* ─── Window controls (Linux/Windows) ─────────────────────────────────────── */
+.windowControls {
+  display: flex;
+  align-items: stretch;
+  height: var(--titlebar-height);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.winBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: var(--titlebar-height);
+  color: var(--color-text-secondary);
+  border-radius: 0;
+  transition: background-color var(--transition-fast);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.winBtn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.closeBtn:hover {
+  background-color: #e81123;
+  color: #ffffff;
 }

@@ -13,6 +13,8 @@ export interface ContextMenuItem {
   separator?: boolean
   /** Nested submenu (opens to the right on hover). */
   children?: ContextMenuItem[]
+  /** Right-aligned shortcut hint (e.g. "Ctrl+T"). */
+  shortcut?: string
 }
 
 interface ContextMenuProps {
@@ -52,6 +54,7 @@ function MenuList({ items, onClose }: { items: ContextMenuItem[]; onClose: () =>
             >
               {item.icon ? <span className={styles.icon}>{item.icon}</span> : <span className={styles.icon} />}
               <span className={styles.label}>{item.label}</span>
+              {item.shortcut ? <span className={styles.shortcut}>{item.shortcut}</span> : null}
               {item.children ? <IconChevronRight size={13} className={styles.subChevron} /> : null}
             </button>
             {item.children && openSub === i ? (
