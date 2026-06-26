@@ -47,4 +47,13 @@
   --syntax-comment: #666666;
   --syntax-operator: #aaaaaa;
   --syntax-type: #3dbfa0;
+
+  /* Data grid */
+  --grid-row-odd: #1e1e1e;
+  --grid-row-even: #242424;
+  --grid-row-hover: #1a2d42;
+  --grid-row-selected: #0c2a42;
+  --grid-col-highlight: rgba(74, 159, 224, 0.08);
+  --grid-header-active: rgba(74, 159, 224, 0.16);
+  --grid-stripe-intensity: 1;
 }

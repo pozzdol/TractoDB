@@ -7,6 +7,7 @@ import type {
   Theme,
   UserPreferences,
 } from '@shared/ipc'
+import { applyPreferences, resolveTheme, type ResolvedTheme } from '@/lib/applyPreferences'
 import { api } from './ipcClient'
 
 export interface BackupTarget {
@@ -18,19 +19,6 @@ export interface BackupTarget {
 export interface BackupModalState {
   mode: 'backup' | 'restore'
   target: BackupTarget
-}
-
-type ResolvedTheme = 'light' | 'dark'
-
-function resolveTheme(theme: Theme): ResolvedTheme {
-  if (theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return theme
-}
-
-function applyTheme(resolved: ResolvedTheme): void {
-  document.documentElement.dataset.theme = resolved
 }
 
 /** Persist helpers — fire-and-forget; a missing bridge must not crash the UI. */
@@ -67,6 +55,7 @@ export interface UiStore {
   secretsBackend: SecretsBackend | null
   backupModal: BackupModalState | null
   clientPathOpen: boolean
+  preferencesOpen: boolean
 
   openConnectionForm: (editId?: string | null) => void
   closeConnectionForm: () => void
@@ -76,10 +65,14 @@ export interface UiStore {
   closeBackupModal: () => void
   openClientPath: () => void
   closeClientPath: () => void
+  openPreferences: () => void
+  closePreferences: () => void
 
   hydrate: () => Promise<void>
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  /** Merge a patch into preferences, apply to the DOM, and persist. */
+  savePreferences: (patch: Partial<UserPreferences>) => void
   setSidebarWidth: (px: number) => void
   setRightPanelWidth: (px: number) => void
   setResultsHeight: (px: number) => void
@@ -97,6 +90,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   secretsBackend: null,
   backupModal: null,
   clientPathOpen: false,
+  preferencesOpen: false,
 
   openConnectionForm(editId = null) {
     set({ connectionForm: { open: true, editId } })
@@ -126,6 +120,14 @@ export const useUiStore = create<UiStore>((set, get) => ({
     set({ clientPathOpen: false })
   },
 
+  openPreferences() {
+    set({ preferencesOpen: true })
+  },
+
+  closePreferences() {
+    set({ preferencesOpen: false })
+  },
+
   dismissSecretsWarning() {
     const preferences = { ...get().preferences, secretsWarningDismissed: true }
     set({ preferences })
@@ -145,8 +147,10 @@ export const useUiStore = create<UiStore>((set, get) => ({
     } catch {
       // Bridge unavailable (e.g. renderer opened outside Electron) — use defaults.
     }
+    // Old preference files may lack the newer keys — backfill from defaults.
+    preferences = { ...DEFAULT_PREFERENCES, ...preferences }
     const resolvedTheme = resolveTheme(preferences.theme)
-    applyTheme(resolvedTheme)
+    applyPreferences(preferences)
 
     let secretsBackend: SecretsBackend | null = null
     try {
@@ -171,22 +175,25 @@ export const useUiStore = create<UiStore>((set, get) => ({
       .matchMedia('(prefers-color-scheme: dark)')
       .addEventListener('change', () => {
         if (get().theme !== 'system') return
-        const next = resolveTheme('system')
-        applyTheme(next)
-        set({ resolvedTheme: next })
+        applyPreferences(get().preferences)
+        set({ resolvedTheme: resolveTheme('system') })
       })
   },
 
   setTheme(theme) {
-    const resolvedTheme = resolveTheme(theme)
-    applyTheme(resolvedTheme)
-    const preferences = { ...get().preferences, theme }
-    set({ theme, resolvedTheme, preferences })
-    persistPreferences(preferences)
+    get().savePreferences({ theme })
   },
 
   toggleTheme() {
     get().setTheme(get().resolvedTheme === 'dark' ? 'light' : 'dark')
+  },
+
+  savePreferences(patch) {
+    const preferences = { ...get().preferences, ...patch }
+    const resolvedTheme = resolveTheme(preferences.theme)
+    applyPreferences(preferences)
+    set({ preferences, theme: preferences.theme, resolvedTheme })
+    persistPreferences(preferences)
   },
 
   setSidebarWidth(px) {

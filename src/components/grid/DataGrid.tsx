@@ -95,10 +95,31 @@ export function DataGrid({
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(320)
   const [sort, setSort] = useState<SortState | null>(null)
-  const [selected, setSelected] = useState<number | null>(null)
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null)
+  const [selectedRow, setSelectedRow] = useState<number | null>(null)
+  const [selectedCol, setSelectedCol] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ index: number; column: string } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+
+  const ROW_NUM_WIDTH = 40 // fixed row-number column, not resizable/reorderable
+
+  // Row OR column selection — never both. Clicking a row number deselects any column.
+  function selectRow(index: number): void {
+    setSelectedCol(null)
+    setSelectedRow((prev) => (prev === index ? null : index))
+  }
+  function selectCol(key: string): void {
+    setSelectedRow(null)
+    setSelectedCol((prev) => (prev === key ? null : key))
+  }
+
+  // Row background priority: selected > hover > zebra stripe.
+  function rowBackground(index: number): string {
+    if (selectedRow === index) return 'var(--grid-row-selected)'
+    if (hoveredRow === index) return 'var(--grid-row-hover)'
+    return index % 2 === 1 ? 'var(--grid-row-even)' : 'var(--grid-row-odd)'
+  }
 
   const columnNames = useMemo(() => columns.map((c) => c.name), [columns])
   const { layout, setColumnWidth, reorderColumn, setRowHeight, resetLayout } = useGridLayout(
@@ -116,7 +137,7 @@ export function DataGrid({
       .filter((x): x is { col: QueryColumn; width: number } => x.col !== undefined)
   }, [columns, layout.columns])
 
-  const tableWidth = displayColumns.reduce((sum, c) => sum + c.width, 0)
+  const tableWidth = ROW_NUM_WIDTH + displayColumns.reduce((sum, c) => sum + c.width, 0)
 
   // Drag-to-resize / drag-to-reorder bookkeeping (refs avoid re-render churn).
   const resize = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
@@ -322,16 +343,18 @@ export function DataGrid({
       >
         <table className={styles.table} style={{ width: tableWidth }}>
           <colgroup>
+            <col style={{ width: ROW_NUM_WIDTH }} />
             {displayColumns.map(({ col, width }) => (
               <col key={col.name} style={{ width }} />
             ))}
           </colgroup>
           <thead>
             <tr>
+              <th className={`${styles.th} ${styles.rowNumHead}`}>#</th>
               {displayColumns.map(({ col, width }, index) => (
                 <th
                   key={col.name}
-                  className={`${styles.th} ${dragOver === index ? styles.dropTarget : ''}`}
+                  className={`${styles.th} ${dragOver === index ? styles.dropTarget : ''} ${selectedCol === col.name ? styles.colActive : ''}`}
                   draggable
                   onDragStart={(e) => onHeaderDragStart(e, index)}
                   onDragOver={(e) => {
@@ -343,7 +366,10 @@ export function DataGrid({
                     dragFrom.current = null
                     setDragOver(null)
                   }}
-                  onClick={() => toggleSort(col.name)}
+                  onClick={() => {
+                    toggleSort(col.name)
+                    selectCol(col.name)
+                  }}
                 >
                   <span className={styles.thLabel}>{col.name}</span>
                   <span className={styles.type}>{col.dataType}</span>
@@ -368,13 +394,20 @@ export function DataGrid({
             {start > 0 ? <tr style={{ height: start * rowHeight }} aria-hidden="true" /> : null}
             {visible.map((row, i) => {
               const index = start + i
+              const rowSelected = selectedRow === index
               return (
                 <tr
                   key={index}
-                  style={{ height: rowHeight }}
-                  className={index === selected ? styles.selected : undefined}
-                  onClick={() => setSelected(index)}
+                  style={{ height: rowHeight, background: rowBackground(index) }}
+                  onMouseEnter={() => setHoveredRow(index)}
+                  onMouseLeave={() => setHoveredRow((prev) => (prev === index ? null : prev))}
                 >
+                  <td
+                    className={`${styles.rowNum} ${rowSelected ? styles.rowNumActive : ''}`}
+                    onClick={() => selectRow(index)}
+                  >
+                    {index + 1}
+                  </td>
                   {displayColumns.map(({ col }) => {
                     const value = row[col.name]
                     const isNull = value === null || value === undefined
@@ -383,6 +416,9 @@ export function DataGrid({
                       <td
                         key={col.name}
                         className={`${styles.td} ${isNull && !isEditing ? styles.null : ''}`}
+                        style={
+                          selectedCol === col.name ? { background: 'var(--grid-col-highlight)' } : undefined
+                        }
                         onContextMenu={(e) => cellMenu(e, row, value)}
                         onDoubleClick={() => {
                           if (editable) setEditing({ index, column: col.name })
@@ -413,6 +449,7 @@ export function DataGrid({
             {isLoadingMore
               ? [0, 1, 2].map((s) => (
                   <tr key={`skel-${s}`} className={styles.skelRow} style={{ height: rowHeight }}>
+                    <td className={styles.rowNum} />
                     {displayColumns.map(({ col }) => (
                       <td key={col.name} className={styles.td}>
                         <span className={styles.skel} />

@@ -6,6 +6,7 @@ import {
   IconSettings,
   IconSquarePlus,
   IconSun,
+  IconTerminal2,
 } from '@tabler/icons-react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
@@ -22,6 +23,7 @@ export function TitleBar() {
   const toggleTheme = useUiStore((s) => s.toggleTheme)
   const openConnectionForm = useUiStore((s) => s.openConnectionForm)
   const openClientPath = useUiStore((s) => s.openClientPath)
+  const openPreferences = useUiStore((s) => s.openPreferences)
 
   const activeName = useConnectionStore((s) => {
     const active = s.connections.find((c) => c.config.id === s.activeConnectionId)
@@ -75,7 +77,10 @@ export function TitleBar() {
         >
           {resolvedTheme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
         </IconButton>
-        <IconButton label="Local client settings" onClick={openClientPath}>
+        <IconButton label="Native client paths" onClick={openClientPath}>
+          <IconTerminal2 size={16} />
+        </IconButton>
+        <IconButton label="Preferences (Ctrl+,)" onClick={openPreferences}>
           <IconSettings size={16} />
         </IconButton>
       </div>

@@ -7,6 +7,7 @@ import { registerAliasProvider } from './autocomplete/aliasProvider'
 import { registerColumnProvider } from './autocomplete/columnProvider'
 import { registerTableProvider } from './autocomplete/tableProvider'
 import type { EditorSchema } from './autocomplete/schemaCache'
+import { useUiStore } from '@/store/uiStore'
 import styles from './QueryEditor.module.css'
 
 // Configure the bundled monaco + themes before the editor mounts (offline; the
@@ -61,6 +62,13 @@ export function QueryEditor({
   onRunSelectionRef.current = onRunSelection
 
   const [mounted, setMounted] = useState<Mounted | null>(null)
+
+  // Editor font follows preferences (Preferences → Editor), live.
+  const editorFontFamily = useUiStore((s) => s.preferences.editorFontFamily)
+  const editorFontSize = useUiStore((s) => s.preferences.editorFontSize)
+  useEffect(() => {
+    mounted?.editor.updateOptions({ fontFamily: editorFontFamily, fontSize: editorFontSize })
+  }, [mounted, editorFontFamily, editorFontSize])
 
   // Register the schema-aware providers; re-register when the connection (schema)
   // changes so columns are never mixed across connections.

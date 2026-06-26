@@ -15,6 +15,7 @@ import { ConnectionForm } from '@/components/connection/ConnectionForm'
 import { BackupWizard } from '@/components/backup/BackupWizard'
 import { RestoreWizard } from '@/components/backup/RestoreWizard'
 import { ClientPathModal } from '@/components/backup/ClientPathModal'
+import { PreferencesModal } from '@/components/settings/PreferencesModal'
 import { useResizable } from '@/hooks/useResizable'
 import { useUiStore } from '@/store/uiStore'
 import { useConnectionStore } from '@/store/connectionStore'
@@ -39,6 +40,7 @@ export default function App() {
 
   const backupModal = useUiStore((s) => s.backupModal)
   const clientPathOpen = useUiStore((s) => s.clientPathOpen)
+  const preferencesOpen = useUiStore((s) => s.preferencesOpen)
 
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null)
   const activeExecution = useQueryStore((s) => (activeTab ? s.byTab[activeTab.id] : undefined))
@@ -66,7 +68,10 @@ export default function App() {
     function onKey(e: KeyboardEvent): void {
       if (!e.ctrlKey && !e.metaKey) return
       const key = e.key.toLowerCase()
-      if (key === 't') {
+      if (key === ',') {
+        e.preventDefault()
+        useUiStore.getState().openPreferences()
+      } else if (key === 't') {
         e.preventDefault()
         useTabStore.getState().openQueryTab({
           connectionId: useConnectionStore.getState().activeConnectionId,
@@ -198,6 +203,7 @@ export default function App() {
       {backupModal?.mode === 'backup' && <BackupWizard />}
       {backupModal?.mode === 'restore' && <RestoreWizard />}
       {clientPathOpen && <ClientPathModal />}
+      {preferencesOpen && <PreferencesModal />}
 
       {connectionFormOpen && <ConnectionForm />}
     </>

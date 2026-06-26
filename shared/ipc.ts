@@ -284,6 +284,8 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
 // ─── Preferences ─────────────────────────────────────────────────────────────
 
 export type Theme = 'light' | 'dark' | 'system'
+export type DensityMode = 'compact' | 'normal' | 'spacious'
+export type GridStripeColor = 'default' | 'blue' | 'green' | 'purple' | 'warm'
 
 export interface UserPreferences {
   theme: Theme
@@ -296,6 +298,18 @@ export interface UserPreferences {
   secretsWarningDismissed: boolean
   /** Native CLI client paths for backup/restore (Phase 2.6). */
   nativeClient?: NativeClientConfig
+
+  // ─── Appearance (Preferences modal) ───
+  uiFontFamily: string
+  uiFontSize: number       // px, 11–16
+  editorFontFamily: string
+  editorFontSize: number   // px, 11–18
+  densityMode: DensityMode
+
+  // ─── Data grid ───
+  gridStripeEnabled: boolean
+  gridStripeColor: GridStripeColor
+  gridStripeIntensity: number // 1–5
 }
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
@@ -306,6 +320,14 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   maxRows: 1000,
   autoComplete: true,
   secretsWarningDismissed: false,
+  uiFontFamily: 'system-ui',
+  uiFontSize: 12,
+  editorFontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  editorFontSize: 13,
+  densityMode: 'normal',
+  gridStripeEnabled: true,
+  gridStripeColor: 'default',
+  gridStripeIntensity: 2,
 }
 
 // ─── Backup & Restore (Native Client) ─────────────────────────────────────────

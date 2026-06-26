@@ -1,0 +1,38 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.input {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--radius-full);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  border: none;
+  cursor: pointer;
+}
+
+.input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.value {
+  flex: 0 0 auto;
+  min-width: 40px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  text-align: right;
+}

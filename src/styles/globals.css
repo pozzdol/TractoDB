@@ -88,6 +88,26 @@
 
   /* Modal/scrim overlay (theme-independent). */
   --color-overlay: rgba(0, 0, 0, 0.32);
+
+  /* Chrome density (overridden per data-density below). */
+  --space-row: 6px;
+}
+
+/* ─── Density modes (Preferences → Appearance) ─────────────────────── */
+[data-density='compact'] {
+  --space-row: 4px;
+  --toolbar-height: 30px;
+  --tab-height: 28px;
+}
+[data-density='normal'] {
+  --space-row: 6px;
+  --toolbar-height: 36px;
+  --tab-height: 34px;
+}
+[data-density='spacious'] {
+  --space-row: 10px;
+  --toolbar-height: 42px;
+  --tab-height: 40px;
 }
 
 /* ─── Reset ────────────────────────────────────────────────────────── */
