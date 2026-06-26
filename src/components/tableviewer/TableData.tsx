@@ -126,6 +126,7 @@ export function TableData({ connectionId, database, schema, table, dbType, readO
       <DataGrid
         columns={columns}
         rows={rows}
+        gridKey={`${connectionId}/${database}/${schema ? `${schema}.` : ''}${table}`}
         hasMore={hasMore}
         isLoadingMore={loadingMore}
         onLoadMore={() => void loadMore()}

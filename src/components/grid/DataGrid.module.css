@@ -1,3 +1,35 @@
+.gridWrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border);
+}
+
+.rowGrip {
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  padding: var(--space-1);
+  color: var(--color-text-tertiary);
+  cursor: row-resize;
+}
+
+.densityBtn {
+  padding: var(--space-2);
+  line-height: 0;
+}
+
 .scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -7,8 +39,7 @@
 
 .table {
   border-collapse: collapse;
-  width: max-content;
-  min-width: 100%;
+  table-layout: fixed;
   font-size: var(--text-sm);
 }
 
@@ -20,6 +51,7 @@
   padding: var(--space-1) var(--space-5);
   text-align: left;
   white-space: nowrap;
+  overflow: hidden;
   font-weight: var(--weight-medium);
   color: var(--color-text-secondary);
   background-color: var(--color-bg-secondary);
@@ -31,6 +63,27 @@
 
 .th:hover {
   background-color: var(--color-bg-hover);
+}
+
+/* Insertion indicator while reordering: accent line on the drop-target's left edge. */
+.dropTarget {
+  box-shadow: inset 2px 0 0 0 var(--color-accent);
+}
+
+/* Resize hit area on the right edge of each header. */
+.resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+}
+
+.resizer:hover,
+.resizer:active {
+  background-color: var(--color-accent);
 }
 
 .thLabel {
@@ -46,9 +99,7 @@
 }
 
 .td {
-  height: var(--row-height, 26px);
-  max-width: 360px;
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-1) var(--space-5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -6,7 +6,7 @@ import { useQuery } from '@/hooks/useQuery'
 import type { ConnectionState } from '@/types/connection'
 import { dialectFor } from './dialect'
 import { QueryToolbar } from './QueryToolbar'
-import type { ColumnMeta } from './autocomplete/schemaCache'
+import type { ColumnMeta, EditorSchema, TableMeta } from './autocomplete/schemaCache'
 import styles from './QueryView.module.css'
 
 // Lazy-load the Monaco-bearing editor so it stays out of the main bundle.
@@ -14,32 +14,31 @@ const QueryEditor = lazy(() =>
   import('./QueryEditor').then((m) => ({ default: m.QueryEditor })),
 )
 
-interface Schema {
-  tables: string[]
-  columns: string[]
-  tableColumns: Map<string, ColumnMeta[]>
-  tableNames: string[]
-}
-
-function collectSchema(conn: ConnectionState | undefined): Schema {
-  const tables = new Set<string>()
-  const columns = new Set<string>()
-  const tableColumns = new Map<string, ColumnMeta[]>()
-  const tableNames: string[] = []
-  conn?.databases.forEach((db) =>
+/** Build the editor's schema view from the connection's loaded tree. */
+function collectSchema(
+  conn: ConnectionState | undefined,
+  database: string | null,
+): EditorSchema | null {
+  if (!conn) return null
+  const tables: TableMeta[] = []
+  const preloaded = new Map<string, ColumnMeta[]>()
+  conn.databases.forEach((db) =>
     db.tables?.forEach((t) => {
-      tables.add(t.name)
-      tableNames.push(t.name.toLowerCase())
+      tables.push({ name: t.name, isView: t.type === 'view' })
       if (t.columns) {
-        tableColumns.set(
+        preloaded.set(
           t.name.toLowerCase(),
-          t.columns.map((c) => ({ name: c.name, dataType: c.dataType, isPrimaryKey: c.isPrimaryKey })),
+          t.columns.map((c) => ({
+            name: c.name,
+            dataType: c.dataType,
+            isPrimaryKey: c.isPrimaryKey,
+            isForeignKey: c.isForeignKey,
+          })),
         )
-        t.columns.forEach((c) => columns.add(c.name))
       }
     }),
   )
-  return { tables: [...tables], columns: [...columns], tableColumns, tableNames }
+  return { connectionId: conn.config.id, database, tables, preloaded }
 }
 
 export function QueryView({ tab }: { tab: QueryEditorTab }) {
@@ -51,9 +50,9 @@ export function QueryView({ tab }: { tab: QueryEditorTab }) {
   const { execution, run, cancel } = useQuery(tab.id)
 
   const connected = conn?.status === 'connected'
-  const { tables, columns, tableColumns, tableNames } = useMemo(() => collectSchema(conn), [conn])
   const language = dialectFor(conn?.config.type ?? 'sql')
   const database = tab.database ?? conn?.config.database ?? null
+  const schema = useMemo(() => collectSchema(conn, database), [conn, database])
 
   function doRun(selection: string): void {
     const text = selection.trim() || tab.sql.trim()
@@ -80,12 +79,7 @@ export function QueryView({ tab }: { tab: QueryEditorTab }) {
           value={tab.sql}
           language={language}
           isDark={isDark}
-          tables={tables}
-          columns={columns}
-          connectionId={tab.connectionId}
-          database={database}
-          tableColumns={tableColumns}
-          tableNames={tableNames}
+          schema={schema}
           onChange={(v) => updateQuerySql(tab.id, v)}
           onRun={() => doRun('')}
           onRunSelection={(sel) => doRun(sel)}

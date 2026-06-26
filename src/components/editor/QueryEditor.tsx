@@ -1,8 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
-import { DARK_THEME, LIGHT_THEME, setCompletionSource, setupMonaco } from './monacoSetup'
-import { setSchemaContext, type ColumnMeta } from './autocomplete/schemaCache'
+import type * as monaco from 'monaco-editor'
+import { DARK_THEME, LIGHT_THEME, setupMonaco } from './monacoSetup'
+import { registerAliasProvider } from './autocomplete/aliasProvider'
+import { registerColumnProvider } from './autocomplete/columnProvider'
+import { registerTableProvider } from './autocomplete/tableProvider'
+import type { EditorSchema } from './autocomplete/schemaCache'
 import styles from './QueryEditor.module.css'
 
 // Configure the bundled monaco + themes before the editor mounts (offline; the
@@ -13,12 +17,8 @@ interface QueryEditorProps {
   value: string
   language: string
   isDark: boolean
-  tables: string[]
-  columns: string[]
-  connectionId: string | null
-  database: string | null
-  tableColumns: Map<string, ColumnMeta[]>
-  tableNames: string[]
+  /** Active connection's schema; null until a connection is active. */
+  schema: EditorSchema | null
   onChange: (value: string) => void
   onRun: () => void
   onRunSelection: (selection: string) => void
@@ -40,16 +40,16 @@ const OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   inlineSuggest: { enabled: true },
 }
 
+type Mounted = {
+  editor: monaco.editor.IStandaloneCodeEditor
+  monaco: typeof monaco
+}
+
 export function QueryEditor({
   value,
   language,
   isDark,
-  tables,
-  columns,
-  connectionId,
-  database,
-  tableColumns,
-  tableNames,
+  schema,
   onChange,
   onRun,
   onRunSelection,
@@ -60,17 +60,22 @@ export function QueryEditor({
   onRunRef.current = onRun
   onRunSelectionRef.current = onRunSelection
 
-  // Refresh the shared autocomplete sources while this editor is focused.
-  function applySchema(): void {
-    setCompletionSource({ tables, columns })
-    setSchemaContext({ connectionId, database, tableColumns, tableNames })
-  }
+  const [mounted, setMounted] = useState<Mounted | null>(null)
+
+  // Register the schema-aware providers; re-register when the connection (schema)
+  // changes so columns are never mixed across connections.
   useEffect(() => {
-    applySchema()
-  }, [tables, columns, connectionId, database, tableColumns, tableNames])
+    if (!mounted || !schema) return
+    const disposables = [
+      registerAliasProvider(mounted.editor, mounted.monaco, schema),
+      registerColumnProvider(mounted.editor, mounted.monaco, schema),
+      registerTableProvider(mounted.editor, mounted.monaco, schema),
+    ]
+    return () => disposables.forEach((d) => d.dispose())
+  }, [mounted, schema])
 
   const handleMount: OnMount = (editorInstance, monacoInstance) => {
-    editorInstance.onDidFocusEditorText(applySchema)
+    setMounted({ editor: editorInstance, monaco: monacoInstance })
 
     editorInstance.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {
       onRunRef.current()

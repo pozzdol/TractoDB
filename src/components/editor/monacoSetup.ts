@@ -1,8 +1,6 @@
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { loader } from '@monaco-editor/react'
-import { registerColumnProvider } from './autocomplete/columnProvider'
-import { registerAliasProvider } from './autocomplete/aliasProvider'
 
 // SQL needs only the base editor worker (no language-service workers).
 self.MonacoEnvironment = {
@@ -21,13 +19,6 @@ const KEYWORDS = [
   'AVG', 'MIN', 'MAX', 'ASC', 'DESC', 'UNION', 'ALL', 'EXISTS', 'CASE', 'WHEN',
   'THEN', 'ELSE', 'END', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'DEFAULT',
 ]
-
-// Schema source for autocomplete — set by the focused editor to its connection.
-let completionSource: { tables: string[]; columns: string[] } = { tables: [], columns: [] }
-
-export function setCompletionSource(source: { tables: string[]; columns: string[] }): void {
-  completionSource = source
-}
 
 let initialised = false
 
@@ -83,9 +74,11 @@ export function setupMonaco(): void {
     },
   })
 
+  // Keyword completion is connection-independent, so it lives here globally.
+  // Tables/columns/aliases are registered per-editor (autocomplete/*Provider.ts)
+  // so they stay scoped to the active connection's schema.
   for (const language of ['sql', 'pgsql', 'mysql']) {
     monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: [' ', '.'],
       provideCompletionItems(model, position) {
         const word = model.getWordUntilPosition(position)
         const range: monaco.IRange = {
@@ -94,34 +87,15 @@ export function setupMonaco(): void {
           startColumn: word.startColumn,
           endColumn: word.endColumn,
         }
-        const suggestions: monaco.languages.CompletionItem[] = [
-          ...KEYWORDS.map((k) => ({
+        return {
+          suggestions: KEYWORDS.map((k) => ({
             label: k,
             kind: monaco.languages.CompletionItemKind.Keyword,
             insertText: k,
             range,
           })),
-          ...completionSource.tables.map((t) => ({
-            label: t,
-            detail: 'table',
-            kind: monaco.languages.CompletionItemKind.Struct,
-            insertText: t,
-            range,
-          })),
-          ...completionSource.columns.map((c) => ({
-            label: c,
-            detail: 'column',
-            kind: monaco.languages.CompletionItemKind.Field,
-            insertText: c,
-            range,
-          })),
-        ]
-        return { suggestions }
+        }
       },
     })
   }
-
-  // Smart alias-aware providers (Feature 4).
-  registerColumnProvider()
-  registerAliasProvider()
 }

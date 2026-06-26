@@ -10,7 +10,7 @@ const SQL_KEYWORDS = new Set([
 const ALIAS_RE =
   /\b(?:from|join)\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s+(?:as\s+)?([A-Za-z_]\w*)/gi
 
-/** Map of lowercased alias → lowercased base table name. */
+/** Map of lowercased alias → lowercased base table name for the current query. */
 export function parseAliases(sql: string): Map<string, string> {
   const map = new Map<string, string>()
   let m: RegExpExecArray | null
@@ -25,15 +25,20 @@ export function parseAliases(sql: string): Map<string, string> {
   return map
 }
 
-/** Generate an alias: first letter, or snake_case initials; number on conflict. */
-export function generateAlias(table: string, used: Set<string>): string {
-  const clean = table.toLowerCase()
-  const base = clean.includes('_')
-    ? clean
-        .split('_')
-        .map((p) => p[0] ?? '')
-        .join('')
-    : (clean[0] ?? 't')
+/**
+ * Generate an alias from a table name (pure):
+ *   ≤3 chars     → use as-is                  (log → log)
+ *   snake_case   → initials of each word      (model_has_roles → mhr)
+ *   single word  → first letter               (users → u, orders → o)
+ * Pass `used` to get a conflict-free alias by appending a number (u → u2 → u3).
+ */
+export function generateAlias(tableName: string, used: Set<string> = new Set()): string {
+  const clean = tableName.toLowerCase().replace(/[^a-z0-9_]/g, '')
+  let base: string
+  if (clean.length <= 3) base = clean
+  else if (clean.includes('_')) base = clean.split('_').filter(Boolean).map((p) => p[0] ?? '').join('')
+  else base = clean[0] ?? 't'
+  if (!base) base = 't'
   let alias = base
   let n = 2
   while (used.has(alias)) alias = `${base}${n++}`
