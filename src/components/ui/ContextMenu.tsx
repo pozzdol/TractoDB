@@ -5,6 +5,8 @@ import styles from './ContextMenu.module.css'
 
 export interface ContextMenuItem {
   label: string
+  /** Muted second line under the label (e.g. first line of a saved query's SQL). */
+  subLabel?: string
   icon?: ReactNode
   onClick?: () => void
   danger?: boolean
@@ -44,7 +46,9 @@ function MenuList({ items, onClose }: { items: ContextMenuItem[]; onClose: () =>
               disabled={item.disabled}
               className={`${styles.item} ${item.danger ? styles.danger : ''}`}
               onClick={() => {
-                if (item.children) {
+                // Items with children but no onClick toggle the submenu; items
+                // with both run their action (hover still reveals the submenu).
+                if (item.children && !item.onClick) {
                   setOpenSub((prev) => (prev === i ? null : i))
                   return
                 }
@@ -53,7 +57,10 @@ function MenuList({ items, onClose }: { items: ContextMenuItem[]; onClose: () =>
               }}
             >
               {item.icon ? <span className={styles.icon}>{item.icon}</span> : <span className={styles.icon} />}
-              <span className={styles.label}>{item.label}</span>
+              <span className={styles.label}>
+                {item.label}
+                {item.subLabel ? <span className={styles.subLabel}>{item.subLabel}</span> : null}
+              </span>
               {item.shortcut ? <span className={styles.shortcut}>{item.shortcut}</span> : null}
               {item.children ? <IconChevronRight size={13} className={styles.subChevron} /> : null}
             </button>

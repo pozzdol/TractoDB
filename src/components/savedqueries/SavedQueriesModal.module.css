@@ -1,0 +1,99 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 560px;
+  max-width: 100%;
+  height: 360px;
+}
+
+.search {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.search:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.empty {
+  margin: auto;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: var(--border);
+}
+
+.row:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.renameInput {
+  height: 26px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

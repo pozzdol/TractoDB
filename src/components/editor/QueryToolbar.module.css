@@ -60,3 +60,51 @@
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
 }
+
+/* ─── Save Query popover ─── */
+.saveWrap {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  z-index: 50;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background-color: var(--color-bg-primary);
+  border: var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+
+.popTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.popInput {
+  height: 30px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.popInput:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.popActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

@@ -50,6 +50,12 @@ export const IPC = {
     LIST: 'folder:list',
     REORDER: 'folder:reorder',
   },
+  SAVED_QUERY: {
+    LIST: 'savedQuery:list',
+    SAVE: 'savedQuery:save',
+    DELETE: 'savedQuery:delete',
+    RENAME: 'savedQuery:rename',
+  },
   DIALOG: {
     OPEN: 'dialog:open',
     SAVE: 'dialog:save',
@@ -202,6 +208,18 @@ export interface QueryResult {
   notice?: string
 }
 
+/** A user-saved query, scoped to one connection + database. */
+export interface SavedQuery {
+  id: string
+  name: string
+  sql: string
+  connectionId: string
+  database: string
+  createdAt: string
+  updatedAt: string
+  lastRunAt?: string
+}
+
 export interface QueryHistoryEntry {
   id: string
   connectionId: string
@@ -337,6 +355,8 @@ export interface PersistedTab {
   database?: string | null
   table?: string
   schema?: string
+  /** Set when this query tab was opened from (or saved as) a saved query. */
+  savedQueryId?: string
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -578,6 +598,12 @@ export interface TractoDbApi {
     delete(id: string): Promise<IpcResponse<FolderDeleteResult>>
     list(): Promise<IpcResponse<ConnectionFolder[]>>
     reorder(items: ReorderItem[]): Promise<IpcResponse<void>>
+  }
+  savedQuery: {
+    list(connectionId: string, database: string): Promise<IpcResponse<SavedQuery[]>>
+    save(query: SavedQuery): Promise<IpcResponse<SavedQuery>>
+    delete(id: string): Promise<IpcResponse<{ deleted: string }>>
+    rename(id: string, name: string): Promise<IpcResponse<SavedQuery>>
   }
   backup: {
     startBackup(config: BackupConfig): Promise<IpcResponse<void>>

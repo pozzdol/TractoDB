@@ -73,6 +73,15 @@ export function QueryView({ tab }: { tab: QueryEditorTab }) {
         onStop={() => {
           if (tab.connectionId) void cancel(tab.connectionId)
         }}
+        sql={tab.sql}
+        connectionId={tab.connectionId}
+        savedQueryId={tab.savedQueryId}
+        savedQueryName={tab.title}
+        onSaved={(id, name) => {
+          const ts = useTabStore.getState()
+          ts.setSavedQueryId(tab.id, id)
+          ts.setTabTitle(tab.id, name)
+        }}
       />
       <Suspense fallback={<div className={styles.loading}>Loading editor…</div>}>
         <QueryEditor

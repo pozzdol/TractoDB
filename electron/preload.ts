@@ -63,6 +63,12 @@ const api: TractoDbApi = {
     list: () => ipcRenderer.invoke(IPC.FOLDER.LIST),
     reorder: (items) => ipcRenderer.invoke(IPC.FOLDER.REORDER, items),
   },
+  savedQuery: {
+    list: (connectionId, database) => ipcRenderer.invoke(IPC.SAVED_QUERY.LIST, connectionId, database),
+    save: (query) => ipcRenderer.invoke(IPC.SAVED_QUERY.SAVE, query),
+    delete: (id) => ipcRenderer.invoke(IPC.SAVED_QUERY.DELETE, id),
+    rename: (id, name) => ipcRenderer.invoke(IPC.SAVED_QUERY.RENAME, id, name),
+  },
   backup: {
     startBackup: (config) => ipcRenderer.invoke(IPC.BACKUP.START_BACKUP, config),
     startRestore: (config) => ipcRenderer.invoke(IPC.BACKUP.START_RESTORE, config),

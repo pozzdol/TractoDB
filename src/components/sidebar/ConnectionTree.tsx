@@ -15,6 +15,8 @@ import {
   IconFileCode,
   IconFolder,
   IconFolderPlus,
+  IconList,
+  IconPlayerPlay,
   IconPlug,
   IconPlugOff,
   IconPlus,
@@ -23,15 +25,20 @@ import {
   IconTrash,
   IconUpload,
 } from '@tabler/icons-react'
-import type { BackupDatabaseType, ConnectionFolder, DatabaseType } from '@shared/ipc'
+import type { BackupDatabaseType, ConnectionFolder, DatabaseType, SavedQuery } from '@shared/ipc'
 import { useConnectionStore, type SidebarNode } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
 import { useUiStore } from '@/store/uiStore'
+import { useSavedQueryStore, deleteSavedQueryWithUndo } from '@/store/savedQueryStore'
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { IconButton } from '@/components/ui/IconButton'
 import { useTableSelection, type TableRef } from '@/store/tableSelectionStore'
+
+const firstLine = (sql: string): string => sql.trim().split('\n')[0]?.trim() ?? ''
+const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s)
 import { ConnectionItem } from './ConnectionItem'
 import { FolderItem, FOLDER_COLORS, FOLDER_COLOR_ORDER } from './FolderItem'
 import { DeleteTableDialog } from './DeleteTableDialog'
@@ -68,6 +75,8 @@ export function ConnectionTree() {
   const openBackup = useUiStore((s) => s.openBackup)
   const openRestore = useUiStore((s) => s.openRestore)
   const showToast = useUiStore((s) => s.showToast)
+  const openSavedQueries = useUiStore((s) => s.openSavedQueries)
+  const renameSavedQuery = useSavedQueryStore((s) => s.rename)
 
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -79,6 +88,8 @@ export function ConnectionTree() {
   const [deleteDialog, setDeleteDialog] = useState<
     { tables: TableRef[]; connectionId: string; dbType: DatabaseType } | null
   >(null)
+  const [renameQuery, setRenameQuery] = useState<SavedQuery | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const dragRef = useRef<DragRef>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -360,20 +371,67 @@ export function ConnectionTree() {
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
-  function openDatabaseMenu(e: MouseEvent, connectionId: string, type: DatabaseType, database: string): void {
+  function openSavedQuery(q: SavedQuery): void {
+    openQueryTab({ connectionId: q.connectionId, database: q.database, sql: q.sql, title: q.name, savedQueryId: q.id })
+  }
+
+  async function openDatabaseMenu(
+    e: MouseEvent,
+    connectionId: string,
+    type: DatabaseType,
+    database: string,
+  ): Promise<void> {
     e.preventDefault()
-    if (type !== 'postgresql' && type !== 'mysql') return
-    const databaseType: BackupDatabaseType = type
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
+    const { clientX: x, clientY: y } = e
+
+    // Load saved queries for this connection+database before building the submenu.
+    await useSavedQueryStore.getState().load(connectionId, database).catch(() => undefined)
+    const queries = useSavedQueryStore
+      .getState()
+      .queries.filter((q) => q.connectionId === connectionId && q.database === database)
+
+    const newQueryItem: ContextMenuItem = {
+      label: 'New Query',
+      icon: <IconFileCode size={14} />,
+      onClick: () => openQueryTab({ connectionId, database }),
+    }
+    const savedItems: ContextMenuItem[] =
+      queries.length === 0
+        ? [{ label: 'No saved queries yet', disabled: true }]
+        : queries.slice(0, 10).map((q) => ({
+            label: truncate(q.name, 40),
+            subLabel: firstLine(q.sql),
+            icon: <IconPlayerPlay size={14} />,
+            onClick: () => openSavedQuery(q),
+            children: [
+              { label: 'Rename', icon: <IconEdit size={14} />, onClick: () => { setRenameQuery(q); setRenameValue(q.name) } },
+              { label: 'Delete', icon: <IconTrash size={14} />, danger: true, onClick: () => deleteSavedQueryWithUndo(q, showToast) },
+            ],
+          }))
+    if (queries.length > 10) {
+      savedItems.push(
+        { label: 'sepAll', separator: true },
+        { label: `View all ${queries.length} queries…`, onClick: () => openSavedQueries(connectionId, database) },
+      )
+    }
+    savedItems.push({ label: 'sepNew', separator: true }, newQueryItem)
+
+    const items: ContextMenuItem[] = []
+    if (type === 'postgresql' || type === 'mysql') {
+      const databaseType: BackupDatabaseType = type
+      items.push(
         { label: 'Backup All Tables…', icon: <IconBolt size={14} />, onClick: () => openBackup({ connectionId, databaseType, database, allTables: true }) },
         { label: 'sep', separator: true },
         { label: 'Backup database', icon: <IconDownload size={14} />, onClick: () => openBackup({ connectionId, databaseType, database }) },
         { label: 'Restore database', icon: <IconUpload size={14} />, onClick: () => openRestore({ connectionId, databaseType, database }) },
-      ],
-    })
+        { label: 'sep2', separator: true },
+      )
+    }
+    items.push(
+      newQueryItem,
+      { label: 'Open Saved Query', icon: <IconList size={14} />, children: savedItems },
+    )
+    setMenu({ x, y, items })
   }
 
   async function commitNewFolder(name: string): Promise<void> {
@@ -428,7 +486,7 @@ export function ConnectionTree() {
           connection={node.data}
           onConnectionContextMenu={openConnectionMenu}
           onTableContextMenu={(e, database, table, schema) => openTableMenu(e, node.data.config.id, database, table, schema)}
-          onDatabaseContextMenu={(e, database) => openDatabaseMenu(e, node.data.config.id, node.data.config.type, database)}
+          onDatabaseContextMenu={(e, database) => void openDatabaseMenu(e, node.data.config.id, node.data.config.type, database)}
         />
       </div>
     )
@@ -497,6 +555,45 @@ export function ConnectionTree() {
           onClose={() => setDeleteDialog(null)}
           onDone={(dropped) => onTablesDropped(deleteDialog.connectionId, dropped)}
         />
+      ) : null}
+
+      {renameQuery ? (
+        <Modal
+          title="Rename query"
+          size="sm"
+          onClose={() => setRenameQuery(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setRenameQuery(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!renameValue.trim()}
+                onClick={() => {
+                  const name = renameValue.trim()
+                  if (name) void renameSavedQuery(renameQuery.id, name)
+                  setRenameQuery(null)
+                }}
+              >
+                Rename
+              </Button>
+            </>
+          }
+        >
+          <Input
+            label="Query name"
+            value={renameValue}
+            autoFocus
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && renameValue.trim()) {
+                void renameSavedQuery(renameQuery.id, renameValue.trim())
+                setRenameQuery(null)
+              }
+            }}
+          />
+        </Modal>
       ) : null}
 
       {deleteTarget ? (

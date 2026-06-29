@@ -6,6 +6,7 @@ import { registerBackupHandlers } from './backup/backup'
 import { registerDialogHandlers } from './dialog'
 import { registerTableMetaHandlers } from './tableMeta'
 import { registerTableWriteHandlers } from './tableWrite'
+import { registerSavedQueryHandlers } from './savedQueries'
 
 /**
  * Central IPC registration — called once from main.ts after the app is ready.
@@ -21,4 +22,5 @@ export function registerIpcHandlers(): void {
   registerDialogHandlers()
   registerTableMetaHandlers()
   registerTableWriteHandlers()
+  registerSavedQueryHandlers()
 }

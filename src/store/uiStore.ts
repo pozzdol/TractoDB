@@ -40,6 +40,12 @@ function persistPreferences(preferences: UserPreferences): void {
   }
 }
 
+/** An optional action button shown inside a toast (e.g. Undo). */
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface ConnectionFormState {
   open: boolean
   /** Connection id being edited, or null for a new connection. */
@@ -60,10 +66,12 @@ export interface UiStore {
   backupModal: BackupModalState | null
   clientPathOpen: boolean
   preferencesOpen: boolean
-  /** Transient toast message (auto-dismissed by the renderer). */
-  toast: string | null
+  /** Transient toast (auto-dismissed by the renderer); optional action button. */
+  toast: { message: string; action?: ToastAction } | null
   /** Connection id whose failure modal is showing, or null. */
   connectionErrorId: string | null
+  /** "View all" saved-queries modal target, or null. */
+  savedQueriesModal: { connectionId: string; database: string } | null
 
   openConnectionForm: (editId?: string | null, defaultFolderId?: string | null) => void
   closeConnectionForm: () => void
@@ -75,10 +83,12 @@ export interface UiStore {
   closeClientPath: () => void
   openPreferences: () => void
   closePreferences: () => void
-  showToast: (message: string) => void
+  showToast: (message: string, action?: ToastAction) => void
   dismissToast: () => void
   showConnectionError: (connectionId: string) => void
   dismissConnectionError: () => void
+  openSavedQueries: (connectionId: string, database: string) => void
+  closeSavedQueries: () => void
 
   hydrate: () => Promise<void>
   setTheme: (theme: Theme) => void
@@ -105,6 +115,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   preferencesOpen: false,
   toast: null,
   connectionErrorId: null,
+  savedQueriesModal: null,
 
   openConnectionForm(editId = null, defaultFolderId = null) {
     set({ connectionForm: { open: true, editId, defaultFolderId } })
@@ -142,12 +153,20 @@ export const useUiStore = create<UiStore>((set, get) => ({
     set({ preferencesOpen: false })
   },
 
-  showToast(message) {
-    set({ toast: message })
+  showToast(message, action) {
+    set({ toast: { message, action } })
   },
 
   dismissToast() {
     set({ toast: null })
+  },
+
+  openSavedQueries(connectionId, database) {
+    set({ savedQueriesModal: { connectionId, database } })
+  },
+
+  closeSavedQueries() {
+    set({ savedQueriesModal: null })
   },
 
   showConnectionError(connectionId) {

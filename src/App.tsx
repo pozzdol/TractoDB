@@ -13,6 +13,7 @@ import { ResultsPanel } from '@/components/editor/ResultsPanel'
 import { TableViewer } from '@/components/tableviewer/TableViewer'
 import { ConnectionForm } from '@/components/connection/ConnectionForm'
 import { ConnectionErrorModal } from '@/components/connection/ConnectionErrorModal'
+import { SavedQueriesModal } from '@/components/savedqueries/SavedQueriesModal'
 import { BackupWizard } from '@/components/backup/BackupWizard'
 import { RestoreWizard } from '@/components/backup/RestoreWizard'
 import { ClientPathModal } from '@/components/backup/ClientPathModal'
@@ -232,7 +233,10 @@ export default function App() {
 
       {connectionFormOpen && <ConnectionForm />}
       <ConnectionErrorModal />
-      {toast ? <Toast message={toast} onDone={dismissToast} /> : null}
+      <SavedQueriesModal />
+      {toast ? (
+        <Toast message={toast.message} action={toast.action} onDone={dismissToast} />
+      ) : null}
     </>
   )
 }

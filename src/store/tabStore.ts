@@ -15,6 +15,8 @@ export interface QueryEditorTab extends BaseTab {
   type: 'query-editor'
   sql: string
   database: string | null
+  /** Set when this tab is bound to a saved query (drives Update vs Save). */
+  savedQueryId?: string
 }
 
 export interface TableViewerTab extends BaseTab {
@@ -39,6 +41,7 @@ function toPersisted(tab: Tab): PersistedTab {
         connectionId: tab.connectionId,
         sql: tab.sql,
         database: tab.database,
+        savedQueryId: tab.savedQueryId,
       }
     : {
         id: tab.id,
@@ -70,6 +73,7 @@ function fromPersisted(p: PersistedTab): Tab {
     connectionId: p.connectionId,
     database: p.database ?? null,
     sql: p.sql ?? '',
+    savedQueryId: p.savedQueryId,
   }
 }
 
@@ -91,6 +95,7 @@ interface OpenQueryOptions {
   database?: string | null
   sql?: string
   title?: string
+  savedQueryId?: string
 }
 
 interface OpenTableOptions {
@@ -108,6 +113,7 @@ export interface TabStore {
 
   openQueryTab: (options?: OpenQueryOptions) => string
   openTableTab: (options: OpenTableOptions) => string
+  setSavedQueryId: (id: string, savedQueryId: string) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   updateQuerySql: (id: string, sql: string) => void
@@ -132,9 +138,18 @@ export const useTabStore = create<TabStore>((set, get) => ({
       connectionId: options.connectionId ?? null,
       database: options.database ?? null,
       sql: options.sql ?? '',
+      savedQueryId: options.savedQueryId,
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: id }))
     return id
+  },
+
+  setSavedQueryId(id, savedQueryId) {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.type === 'query-editor' ? { ...t, savedQueryId } : t,
+      ),
+    }))
   },
 
   openTableTab(options) {
