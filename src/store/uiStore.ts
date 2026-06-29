@@ -62,6 +62,8 @@ export interface UiStore {
   preferencesOpen: boolean
   /** Transient toast message (auto-dismissed by the renderer). */
   toast: string | null
+  /** Connection id whose failure modal is showing, or null. */
+  connectionErrorId: string | null
 
   openConnectionForm: (editId?: string | null, defaultFolderId?: string | null) => void
   closeConnectionForm: () => void
@@ -75,6 +77,8 @@ export interface UiStore {
   closePreferences: () => void
   showToast: (message: string) => void
   dismissToast: () => void
+  showConnectionError: (connectionId: string) => void
+  dismissConnectionError: () => void
 
   hydrate: () => Promise<void>
   setTheme: (theme: Theme) => void
@@ -100,6 +104,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   clientPathOpen: false,
   preferencesOpen: false,
   toast: null,
+  connectionErrorId: null,
 
   openConnectionForm(editId = null, defaultFolderId = null) {
     set({ connectionForm: { open: true, editId, defaultFolderId } })
@@ -143,6 +148,14 @@ export const useUiStore = create<UiStore>((set, get) => ({
 
   dismissToast() {
     set({ toast: null })
+  },
+
+  showConnectionError(connectionId) {
+    set({ connectionErrorId: connectionId })
+  },
+
+  dismissConnectionError() {
+    set({ connectionErrorId: null })
   },
 
   dismissSecretsWarning() {

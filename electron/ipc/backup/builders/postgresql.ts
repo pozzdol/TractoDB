@@ -27,7 +27,9 @@ export function buildDumpArgs(config: BackupConfig, conn: ConnectionConfig): str
   const format = config.format ?? 'plain'
   const args = [...connectionArgs(conn), '-d', config.database, '-f', config.outputPath]
   args.push('-F', FORMAT_FLAG[format])
-  if (config.compression !== undefined && (format === 'custom' || format === 'tar')) {
+  // Only custom/directory support -Z; tar and plain reject it ("compression is
+  // not supported by tar archive format").
+  if (config.compression !== undefined && (format === 'custom' || format === 'directory')) {
     args.push('-Z', String(config.compression))
   }
   for (const schema of config.schemas ?? []) args.push('-n', schema)

@@ -1,4 +1,4 @@
-import { IconLock } from '@tabler/icons-react'
+import { IconAlertTriangle, IconLock } from '@tabler/icons-react'
 import type { MouseEvent } from 'react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { DatabaseIcon } from '@/components/ui/DatabaseIcon'
@@ -31,20 +31,24 @@ export function ConnectionItem({
   const { config, status } = connection
   const connected = status === 'connected'
   const isProd = config.environment === 'production'
+  const isError = status === 'error'
 
   return (
     <div role="group">
       <TreeRow
         depth={0}
         label={config.name}
-        danger={isProd}
+        danger={isProd || isError}
         icon={<DatabaseIcon type={config.type} size={16} />}
         expandable={connected}
         expanded={connection.expanded}
         loading={status === 'connecting'}
-        title={status === 'error' ? connection.errorMessage : config.name}
+        title={isError ? connection.errorMessage : config.name}
         meta={
           <>
+            {isError ? (
+              <IconAlertTriangle size={12} className={styles.warn} aria-label="Connection error" />
+            ) : null}
             {isProd ? <IconLock size={11} className={styles.lock} /> : null}
             {isProd ? <span className={styles.prodBadge}>PROD</span> : null}
             <span

@@ -10,6 +10,7 @@ import type {
 } from '@/types/connection'
 import type { DatabaseNode, TableNode } from '@/types/schema'
 import { api, unwrap } from './ipcClient'
+import { useUiStore } from './uiStore'
 
 /** A node in the sidebar tree: a folder (with children) or a connection. */
 export type SidebarNode =
@@ -218,6 +219,8 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
           errorMessage: err instanceof Error ? err.message : String(err),
         })),
       }))
+      // Surface the failure prominently — the message matters and must be readable.
+      useUiStore.getState().showConnectionError(id)
     }
   },
 

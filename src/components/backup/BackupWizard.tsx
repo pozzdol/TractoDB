@@ -269,9 +269,14 @@ export function BackupWizard() {
                   min={0}
                   max={9}
                   value={options.compression}
-                  disabled={options.format === 'plain' || options.format === 'directory'}
+                  disabled={options.format === 'tar' || options.format === 'plain'}
                   onChange={(e) => set('compression', Number(e.target.value))}
                 />
+                {options.format === 'tar' || options.format === 'plain' ? (
+                  <span className={styles.hint}>
+                    Compression is only available for Custom and Directory formats.
+                  </span>
+                ) : null}
               </label>
               <Check label="No owner" v={options.noOwner} on={(b) => set('noOwner', b)} />
               <Check label="No privileges" v={options.noPrivileges} on={(b) => set('noPrivileges', b)} />

@@ -12,6 +12,7 @@ import { QueryView } from '@/components/editor/QueryView'
 import { ResultsPanel } from '@/components/editor/ResultsPanel'
 import { TableViewer } from '@/components/tableviewer/TableViewer'
 import { ConnectionForm } from '@/components/connection/ConnectionForm'
+import { ConnectionErrorModal } from '@/components/connection/ConnectionErrorModal'
 import { BackupWizard } from '@/components/backup/BackupWizard'
 import { RestoreWizard } from '@/components/backup/RestoreWizard'
 import { ClientPathModal } from '@/components/backup/ClientPathModal'
@@ -230,6 +231,7 @@ export default function App() {
       {preferencesOpen && <PreferencesModal />}
 
       {connectionFormOpen && <ConnectionForm />}
+      <ConnectionErrorModal />
       {toast ? <Toast message={toast} onDone={dismissToast} /> : null}
     </>
   )

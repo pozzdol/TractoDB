@@ -26,6 +26,11 @@
   flex: 0 0 auto;
 }
 
+.warn {
+  color: var(--color-danger);
+  flex: 0 0 auto;
+}
+
 .prodBadge {
   flex: 0 0 auto;
   padding: 0 var(--space-1);

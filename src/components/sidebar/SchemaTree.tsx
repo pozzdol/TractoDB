@@ -1,12 +1,13 @@
 import {
   IconCode,
   IconColumns,
+  IconFolder,
   IconKey,
   IconLayoutList,
   IconLink,
   IconTable,
 } from '@tabler/icons-react'
-import type { MouseEvent, ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useTabStore } from '@/store/tabStore'
 import { useTableSelection, tableKey, type TableRef } from '@/store/tableSelectionStore'
@@ -43,7 +44,7 @@ function columnIcon(column: ColumnInfo): ReactNode {
   return <IconColumns size={12} />
 }
 
-function ColumnRow({ column }: { column: ColumnInfo }) {
+function ColumnRow({ column, depth }: { column: ColumnInfo; depth: number }) {
   const meta = (
     <span className={styles.columnType}>
       {column.dataType}
@@ -52,7 +53,7 @@ function ColumnRow({ column }: { column: ColumnInfo }) {
   )
   return (
     <TreeRow
-      depth={3}
+      depth={depth}
       compact
       label={column.name}
       icon={columnIcon(column)}
@@ -71,13 +72,15 @@ function TableRow({
   database,
   table,
   siblings,
+  depth,
   onTableContextMenu,
 }: {
   connectionId: string
   database: string
   table: TableNode
-  /** All tables in the same database (for shift-range, filtered to same schema). */
+  /** Sibling tables in the same schema/database (for shift-range). */
   siblings: TableNode[]
+  depth: number
   onTableContextMenu: TableContextHandler
 }) {
   const toggleTable = useConnectionStore((s) => s.toggleTable)
@@ -111,7 +114,7 @@ function TableRow({
   return (
     <>
       <TreeRow
-        depth={2}
+        depth={depth}
         compact
         expandable
         expanded={table.expanded}
@@ -127,8 +130,60 @@ function TableRow({
       />
       {table.expanded && table.columns
         ? table.columns.length > 0
-          ? table.columns.map((c) => <ColumnRow key={c.name} column={c} />)
-          : !table.loadingColumns && <EmptyRow depth={3} label="No columns" />
+          ? table.columns.map((c) => <ColumnRow key={c.name} column={c} depth={depth + 1} />)
+          : !table.loadingColumns && <EmptyRow depth={depth + 1} label="No columns" />
+        : null}
+    </>
+  )
+}
+
+/**
+ * Schema grouping node (depth 2). Only rendered for dialects that expose schemas
+ * (PostgreSQL); MySQL/SQLite tables carry no schema and stay flat under the DB.
+ * Tables are already fully loaded with the database, so expand state is local.
+ */
+function SchemaRow({
+  connectionId,
+  database,
+  schema,
+  tables,
+  onTableContextMenu,
+}: {
+  connectionId: string
+  database: string
+  schema: string
+  tables: TableNode[]
+  onTableContextMenu: TableContextHandler
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const toggle = (): void => {
+    useTableSelection.getState().clear() // expanding/collapsing a schema clears table selection
+    setExpanded((e) => !e)
+  }
+  return (
+    <>
+      <TreeRow
+        depth={2}
+        compact
+        expandable
+        expanded={expanded}
+        label={schema}
+        icon={<IconFolder size={12} />}
+        onActivate={toggle}
+        onToggle={toggle}
+      />
+      {expanded
+        ? tables.map((t) => (
+            <TableRow
+              key={t.name}
+              connectionId={connectionId}
+              database={database}
+              table={t}
+              siblings={tables}
+              depth={3}
+              onTableContextMenu={onTableContextMenu}
+            />
+          ))
         : null}
     </>
   )
@@ -148,6 +203,38 @@ function DatabaseRow({
   onDatabaseContextMenu?: DatabaseContextHandler
 }) {
   const toggleDatabase = useConnectionStore((s) => s.toggleDatabase)
+  const tables = database.tables ?? []
+  // Distinct non-empty schemas → render schema grouping nodes (PostgreSQL).
+  const schemas = [...new Set(tables.map((t) => t.schema).filter((s): s is string => !!s))].sort()
+
+  function renderTables(): ReactNode {
+    if (tables.length === 0) {
+      return !database.loadingTables ? <EmptyRow depth={2} label="No tables" /> : null
+    }
+    if (schemas.length > 0) {
+      return schemas.map((sch) => (
+        <SchemaRow
+          key={sch}
+          connectionId={connectionId}
+          database={database.name}
+          schema={sch}
+          tables={tables.filter((t) => t.schema === sch)}
+          onTableContextMenu={onTableContextMenu}
+        />
+      ))
+    }
+    return tables.map((t) => (
+      <TableRow
+        key={t.name}
+        connectionId={connectionId}
+        database={database.name}
+        table={t}
+        siblings={tables}
+        depth={2}
+        onTableContextMenu={onTableContextMenu}
+      />
+    ))
+  }
 
   return (
     <>
@@ -169,20 +256,7 @@ function DatabaseRow({
           onDatabaseContextMenu ? (e) => onDatabaseContextMenu(e, database.name) : undefined
         }
       />
-      {database.expanded && database.tables
-        ? database.tables.length > 0
-          ? database.tables.map((t) => (
-              <TableRow
-                key={t.name}
-                connectionId={connectionId}
-                database={database.name}
-                table={t}
-                siblings={database.tables ?? []}
-                onTableContextMenu={onTableContextMenu}
-              />
-            ))
-          : !database.loadingTables && <EmptyRow depth={2} label="No tables" />
-        : null}
+      {database.expanded ? renderTables() : null}
     </>
   )
 }
