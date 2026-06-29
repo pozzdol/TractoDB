@@ -373,12 +373,14 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
 
   // ── Copy / Paste (TSV, Excel-style) ──────────────────────────────────────────
   function handleCopy(): void {
-    const names = columns.map((c) => c.name)
+    // Rows are keyed by displayName; the header uses displayName too. (BUG 8)
+    const dnames = columns.map((c) => c.displayName)
+    const cell = (v: unknown): string => (v === null || v === undefined ? '' : String(v))
     let tsv = ''
     if (selCells.length > 0) {
-      // bounding box over selected cells
+      // bounding box over selected cells, no header (Excel cell-range behaviour)
       const rIdx = selCells.map((c) => indexByRowId.get(c.row['__rowId'] as string) ?? -1).filter((n) => n >= 0)
-      const cIdx = selCells.map((c) => names.indexOf(c.colKey)).filter((n) => n >= 0)
+      const cIdx = selCells.map((c) => dnames.indexOf(c.colKey)).filter((n) => n >= 0)
       const rLo = Math.min(...rIdx)
       const rHi = Math.max(...rIdx)
       const cLo = Math.min(...cIdx)
@@ -386,7 +388,7 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
       const lines: string[] = []
       for (let r = rLo; r <= rHi; r++) {
         const cells: string[] = []
-        for (let c = cLo; c <= cHi; c++) cells.push(String(editRows[r]?.current[names[c] ?? ''] ?? ''))
+        for (let c = cLo; c <= cHi; c++) cells.push(cell(editRows[r]?.current[dnames[c] ?? '']))
         lines.push(cells.join('\t'))
       }
       tsv = lines.join('\n')
@@ -395,8 +397,8 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         .map((r) => indexByRowId.get(r['__rowId'] as string) ?? -1)
         .filter((n) => n >= 0)
         .sort((a, b) => a - b)
-      const lines = [names.join('\t')]
-      for (const i of ids) lines.push(names.map((n) => String(editRows[i]?.current[n] ?? '')).join('\t'))
+      const lines = [dnames.join('\t')]
+      for (const i of ids) lines.push(dnames.map((n) => cell(editRows[i]?.current[n])).join('\t'))
       tsv = lines.join('\n')
     } else {
       return
@@ -413,13 +415,34 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     } catch {
       return
     }
-    if (!text) return
-    const names = columns.map((c) => c.name)
+    if (!text.trim()) return
+    // Rows are keyed by the unique displayName; columns match by POSITION (Excel).
+    const dnames = columns.map((c) => c.displayName)
+
+    // JSON: array of objects (or one object) matched by column displayName.
+    const trimmed = text.trim()
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed)
+        const objs = (Array.isArray(parsed) ? parsed : [parsed]) as Record<string, unknown>[]
+        const newRows = objs.map((o): EditRow => {
+          const current: Row = {}
+          for (const c of columns) if (o[c.displayName] !== undefined) current[c.displayName] = o[c.displayName]
+          return { rowId: tmpId(), original: null, current, state: 'new' }
+        })
+        setEditRows((rows) => [...rows, ...newRows])
+        setToast(`Pasted ${newRows.length} row${newRows.length === 1 ? '' : 's'}`)
+        return
+      } catch {
+        /* not valid JSON — fall through to TSV */
+      }
+    }
+
     let grid = text.replace(/\r/g, '').split('\n').filter((l) => l.length > 0).map((l) => l.split('\t'))
     if (grid.length === 0) return
-    // drop a header row if it matches column names
+    // drop a header row if it matches column display names
     const first = grid[0] ?? []
-    if (first.length > 0 && first.every((h) => names.some((n) => n.toLowerCase() === h.trim().toLowerCase()))) {
+    if (first.length > 0 && first.every((h) => dnames.some((n) => n.toLowerCase() === h.trim().toLowerCase()))) {
       grid = grid.slice(1)
     }
     if (grid.length === 0) return
@@ -427,7 +450,7 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     const anchor = selCells.length === 1 ? selCells[0] : null
     if (anchor) {
       const aRow = indexByRowId.get(anchor.row['__rowId'] as string) ?? 0
-      const aCol = Math.max(0, names.indexOf(anchor.colKey))
+      const aCol = Math.max(0, dnames.indexOf(anchor.colKey))
       setEditRows((rows) => {
         const out = [...rows]
         grid.forEach((line, r) => {
@@ -437,15 +460,15 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
             if (!er) return
             const current = { ...er.current }
             line.forEach((val, c) => {
-              const col = names[aCol + c]
-              if (col) current[col] = val
+              const dn = dnames[aCol + c]
+              if (dn) current[dn] = val
             })
             out[target] = { ...er, current, state: er.state === 'new' ? 'new' : 'modified' }
           } else {
             const current: Row = {}
             line.forEach((val, c) => {
-              const col = names[aCol + c]
-              if (col) current[col] = val
+              const dn = dnames[aCol + c]
+              if (dn) current[dn] = val
             })
             out.push({ rowId: tmpId(), original: null, current, state: 'new' })
           }
@@ -453,14 +476,14 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         return out
       })
     } else {
-      // append as new rows, mapping columns left-to-right
+      // append as new rows, mapping columns left-to-right by position
       setEditRows((rows) => [
         ...rows,
         ...grid.map((line): EditRow => {
           const current: Row = {}
           line.forEach((val, c) => {
-            const col = names[c]
-            if (col) current[col] = val
+            const dn = dnames[c]
+            if (dn) current[dn] = val
           })
           return { rowId: tmpId(), original: null, current, state: 'new' }
         }),
@@ -635,7 +658,6 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         tableName={qualified}
         onSelectionChange={onSelectionChange}
         toolbarExtra={toolbar}
-        onCopy={handleCopy}
         onPaste={() => void handlePaste()}
         columnFilters={columnFilters}
         onLoadDistinct={loadDistinct}

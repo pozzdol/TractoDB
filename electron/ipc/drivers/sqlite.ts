@@ -9,6 +9,7 @@ import type {
   TableInfo,
   TableType,
 } from '../../../shared/ipc'
+import { generateDisplayNames } from '../../../shared/ipc'
 import { type DatabaseDriver, type DriverConfig, nowMs } from './base'
 import { DriverError, translateError } from './errors'
 
@@ -111,11 +112,22 @@ export class SqliteDriver implements DatabaseDriver {
     try {
       const stmt = db.prepare(sql)
       if (stmt.reader) {
-        const rows = stmt.all() as Record<string, unknown>[]
         const columns: QueryColumn[] = stmt.columns().map((c) => ({
           name: c.name,
+          displayName: c.name,
           dataType: c.type ?? 'unknown',
         }))
+        generateDisplayNames(columns)
+        // raw(true) returns positional arrays so duplicate column names don't
+        // collide; we re-key by unique displayName.
+        const rawRows = stmt.raw(true).all() as unknown[][]
+        const rows = rawRows.map((vals) => {
+          const o: Record<string, unknown> = {}
+          columns.forEach((c, i) => {
+            o[c.displayName] = vals[i]
+          })
+          return o
+        })
         return { columns, rows, rowCount: rows.length, durationMs: nowMs() - started, sql }
       }
       const info = stmt.run()

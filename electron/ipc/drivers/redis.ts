@@ -232,15 +232,15 @@ function toResult(reply: unknown): Pick<QueryResult, 'columns' | 'rows' | 'rowCo
     const rows = reply.map((value, i) => ({ '#': i + 1, value: stringify(value) }))
     return {
       columns: [
-        { name: '#', dataType: 'index' },
-        { name: 'value', dataType: 'string' },
+        { name: '#', displayName: '#', dataType: 'index' },
+        { name: 'value', displayName: 'value', dataType: 'string' },
       ],
       rows,
       rowCount: rows.length,
     }
   }
   return {
-    columns: [{ name: 'value', dataType: 'string' }],
+    columns: [{ name: 'value', displayName: 'value', dataType: 'string' }],
     rows: [{ value: stringify(reply) }],
     rowCount: 1,
   }

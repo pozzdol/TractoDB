@@ -8,6 +8,7 @@ import type {
   TableInfo,
   TableType,
 } from '../../../shared/ipc'
+import { generateDisplayNames } from '../../../shared/ipc'
 import { type DatabaseDriver, type DriverConfig, nowMs, withTimeout } from './base'
 import { translateError } from './errors'
 
@@ -144,13 +145,24 @@ export class PostgresDriver implements DatabaseDriver {
     try {
       const pid = await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')
       this.currentPid = pid.rows[0]?.pid ?? null
-      const result = await client.query(sql)
+      // rowMode 'array' gives positional values so duplicate column names
+      // (self-joins) don't collide; we re-key by unique displayName.
+      const result = await client.query({ text: sql, rowMode: 'array' })
       const fields = result.fields ?? []
       const columns: QueryColumn[] = fields.map((f) => ({
         name: f.name,
+        displayName: f.name,
         dataType: pgTypeName(f.dataTypeID),
       }))
-      const rows = (result.rows ?? []) as Record<string, unknown>[]
+      generateDisplayNames(columns)
+      const rawRows = (result.rows ?? []) as unknown[][]
+      const rows = rawRows.map((vals) => {
+        const o: Record<string, unknown> = {}
+        columns.forEach((c, i) => {
+          o[c.displayName] = vals[i]
+        })
+        return o
+      })
       return {
         columns,
         rows,

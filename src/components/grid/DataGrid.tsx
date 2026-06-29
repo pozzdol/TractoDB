@@ -21,6 +21,7 @@ import {
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu'
 import { Button } from '@/components/ui/Button'
 import { ROW_HEIGHT_PRESETS, useGridLayout } from '@/hooks/useGridLayout'
+import { type FmtColumn, toJSON, toMarkdown, toSQL, toTSV, tsvCell } from '@/lib/gridFormat'
 import type { QueryColumn } from '@/types/query'
 import { FilterPopover } from './FilterPopover'
 import styles from './DataGrid.module.css'
@@ -49,8 +50,7 @@ interface DataGridProps {
   onSelectionChange?: (rows: Row[], cells: { row: Row; colKey: string }[]) => void
   /** Extra controls injected at the left of the grid toolbar (row operations). */
   toolbarExtra?: ReactNode
-  /** Ctrl+C / Ctrl+V within the grid. */
-  onCopy?: () => void
+  /** Ctrl+V within the grid (paste is staged-edit only). Copy is handled here. */
   onPaste?: () => void
   /** Per-column filters (Feature 5): active filter values keyed by column. */
   columnFilters?: Map<string, unknown[]>
@@ -81,12 +81,6 @@ function cellText(value: unknown): string {
   return String(value)
 }
 
-function sqlLiteral(value: unknown): string {
-  if (value === null || value === undefined) return 'NULL'
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return `'${cellText(value).replace(/'/g, "''")}'`
-}
-
 // Cached canvas for measuring text width (auto-fit).
 let measureCtx: CanvasRenderingContext2D | null = null
 function textWidth(text: string, font: string): number {
@@ -108,7 +102,6 @@ export function DataGrid({
   tableName,
   onSelectionChange,
   toolbarExtra,
-  onCopy,
   onPaste,
   columnFilters,
   onLoadDistinct,
@@ -164,7 +157,7 @@ export function DataGrid({
   }
 
   // ── Cell selection: independent of row selection ────────────────────────────
-  const colIndex = (key: string): number => displayColumns.findIndex((c) => c.col.name === key)
+  const colIndex = (key: string): number => displayColumns.findIndex((c) => c.col.displayName === key)
   function onCellClick(e: MouseEvent, index: number, colKey: string): void {
     const key = `${index}:${colKey}`
     if (e.shiftKey && lastClickedCell) {
@@ -178,7 +171,7 @@ export function DataGrid({
       setSelectedCells(() => {
         const next = new Set<string>()
         for (let r = rLo; r <= rHi; r++)
-          for (let c = cLo; c <= cHi; c++) next.add(`${r}:${displayColumns[c]?.col.name}`)
+          for (let c = cLo; c <= cHi; c++) next.add(`${r}:${displayColumns[c]?.col.displayName}`)
         return next
       })
     } else if (e.ctrlKey || e.metaKey) {
@@ -204,20 +197,60 @@ export function DataGrid({
 
   function onGridKeyDown(e: KeyboardEvent): void {
     if (!(e.ctrlKey || e.metaKey)) return
+    // Don't hijack copy/paste while editing a cell input.
+    const el = e.target as HTMLElement
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return
     const k = e.key.toLowerCase()
     if (k === 'a') {
       e.preventDefault()
       setSelectedRows(new Set(sortedRows.map((_, i) => i)))
-    } else if (k === 'c' && onCopy) {
+    } else if (k === 'c') {
       e.preventDefault()
-      onCopy()
+      doCopy()
     } else if (k === 'v' && onPaste) {
       e.preventDefault()
       onPaste()
     }
   }
 
-  const columnNames = useMemo(() => columns.map((c) => c.name), [columns])
+  const fmtCols = (): FmtColumn[] =>
+    displayColumns.map((d) => ({ name: d.col.name, displayName: d.col.displayName }))
+  const selectedRowObjects = (): Row[] =>
+    [...selectedRows].sort((a, b) => a - b).map((i) => sortedRows[i]).filter((r): r is Row => !!r)
+  const writeClip = (text: string): void => void navigator.clipboard.writeText(text)
+
+  // Ctrl+C: cell-range → TSV (no header); else full rows → TSV (with header). (BUG 8)
+  function doCopy(): void {
+    if (selectedCells.size > 0) {
+      const cells = [...selectedCells]
+        .map((kk) => {
+          const i = kk.indexOf(':')
+          return { r: Number(kk.slice(0, i)), c: colIndex(kk.slice(i + 1)) }
+        })
+        .filter((c) => c.c >= 0)
+      if (cells.length === 0) return
+      const rs = cells.map((c) => c.r)
+      const cs = cells.map((c) => c.c)
+      const [rLo, rHi] = [Math.min(...rs), Math.max(...rs)]
+      const [cLo, cHi] = [Math.min(...cs), Math.max(...cs)]
+      const lines: string[] = []
+      for (let r = rLo; r <= rHi; r++) {
+        const vals: string[] = []
+        for (let c = cLo; c <= cHi; c++) {
+          const dn = displayColumns[c]?.col.displayName
+          vals.push(tsvCell(dn ? sortedRows[r]?.[dn] : undefined))
+        }
+        lines.push(vals.join('\t'))
+      }
+      writeClip(lines.join('\n'))
+      return
+    }
+    if (selectedRows.size > 0) writeClip(toTSV(fmtCols(), selectedRowObjects(), true))
+  }
+
+  // Columns are keyed by the unique displayName ("title", "title (2)") so
+  // duplicate column names (self-joins) don't collide in layout/selection/rows.
+  const columnNames = useMemo(() => columns.map((c) => c.displayName), [columns])
   const { layout, setColumnWidth, reorderColumn, setRowHeight, resetLayout } = useGridLayout(
     gridKey,
     columnNames,
@@ -226,7 +259,7 @@ export function DataGrid({
 
   // Columns in display order, joined with their server metadata + width.
   const displayColumns = useMemo(() => {
-    const byKey = new Map(columns.map((c) => [c.name, c]))
+    const byKey = new Map(columns.map((c) => [c.displayName, c]))
     return [...layout.columns]
       .sort((a, b) => a.order - b.order)
       .map((cl) => ({ col: byKey.get(cl.key), width: cl.width }))
@@ -376,22 +409,27 @@ export function DataGrid({
 
   function cellMenu(e: MouseEvent, row: Row, value: unknown): void {
     e.preventDefault()
-    const items: ContextMenuItem[] = [
-      { label: 'Copy value', onClick: () => void navigator.clipboard.writeText(cellText(value)) },
-      {
-        label: 'Copy row as JSON',
-        onClick: () => void navigator.clipboard.writeText(JSON.stringify(row, null, 2)),
-      },
+    const cols = fmtCols()
+    const rowAs: ContextMenuItem[] = [
+      { label: 'TSV (Excel)', onClick: () => writeClip(toTSV(cols, [row], false)) },
+      { label: 'JSON', onClick: () => writeClip(toJSON(cols, [row], false)) },
+      ...(tableName ? [{ label: 'SQL INSERT', onClick: () => writeClip(toSQL(cols, [row], tableName)) }] : []),
+      { label: 'Markdown Table', onClick: () => writeClip(toMarkdown(cols, [row])) },
     ]
-    if (tableName) {
-      items.push({
-        label: 'Copy row as SQL INSERT',
-        onClick: () => {
-          const cols = displayColumns.map((c) => c.col.name).join(', ')
-          const vals = displayColumns.map((c) => sqlLiteral(row[c.col.name])).join(', ')
-          void navigator.clipboard.writeText(`INSERT INTO ${tableName} (${cols}) VALUES (${vals});`)
-        },
-      })
+    const items: ContextMenuItem[] = [
+      { label: 'Copy Cell Value', onClick: () => writeClip(cellText(value)) },
+      { label: 'sep1', separator: true },
+      { label: 'Copy Row as…', children: rowAs },
+    ]
+    if (selectedRows.size > 1) {
+      const sel = selectedRowObjects()
+      const selAs: ContextMenuItem[] = [
+        { label: 'TSV (Excel)', onClick: () => writeClip(toTSV(cols, sel, true)) },
+        { label: 'JSON Array', onClick: () => writeClip(toJSON(cols, sel, true)) },
+        ...(tableName ? [{ label: 'SQL INSERTs', onClick: () => writeClip(toSQL(cols, sel, tableName)) }] : []),
+        { label: 'Markdown Table', onClick: () => writeClip(toMarkdown(cols, sel)) },
+      ]
+      items.push({ label: 'sep2', separator: true }, { label: 'Copy Selection as…', children: selAs })
     }
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
@@ -460,16 +498,20 @@ export function DataGrid({
           <colgroup>
             <col style={{ width: ROW_NUM_WIDTH }} />
             {displayColumns.map(({ col, width }) => (
-              <col key={col.name} style={{ width }} />
+              <col key={col.displayName} style={{ width }} />
             ))}
           </colgroup>
           <thead>
             <tr>
               <th className={`${styles.th} ${styles.rowNumHead}`}>#</th>
-              {displayColumns.map(({ col, width }, index) => (
+              {displayColumns.map(({ col, width }, index) => {
+                const key = col.displayName
+                const headerTitle = col.tableAlias ? `${col.name} — from ${col.tableAlias}` : col.name
+                return (
                 <th
-                  key={col.name}
-                  className={`${styles.th} ${dragOver === index ? styles.dropTarget : ''} ${selectedCol === col.name ? styles.colActive : ''}`}
+                  key={key}
+                  title={headerTitle}
+                  className={`${styles.th} ${dragOver === index ? styles.dropTarget : ''} ${selectedCol === key ? styles.colActive : ''}`}
                   draggable
                   onDragStart={(e) => onHeaderDragStart(e, index)}
                   onDragOver={(e) => {
@@ -482,43 +524,44 @@ export function DataGrid({
                     setDragOver(null)
                   }}
                   onClick={() => {
-                    toggleSort(col.name)
-                    selectCol(col.name)
+                    toggleSort(key)
+                    selectCol(key)
                   }}
                 >
-                  <span className={styles.thLabel}>{col.name}</span>
+                  <span className={styles.thLabel}>{col.displayName}</span>
                   <span className={styles.type}>{col.dataType}</span>
-                  {sort?.column === col.name ? (
+                  {sort?.column === key ? (
                     sort.dir === 'asc' ? <IconChevronUp size={11} /> : <IconChevronDown size={11} />
                   ) : null}
                   {onLoadDistinct ? (
                     <button
                       type="button"
-                      className={`${styles.filterBtn} ${columnFilters?.has(col.name) ? styles.filterActive : ''}`}
-                      aria-label={`Filter ${col.name}`}
-                      title={`Filter ${col.name}`}
+                      className={`${styles.filterBtn} ${columnFilters?.has(key) ? styles.filterActive : ''}`}
+                      aria-label={`Filter ${key}`}
+                      title={`Filter ${key}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         const r = e.currentTarget.closest('th')?.getBoundingClientRect()
-                        if (r) setFilterPopover({ col: col.name, x: r.left, y: r.bottom })
+                        if (r) setFilterPopover({ col: key, x: r.left, y: r.bottom })
                       }}
                     >
                       <IconFilter size={11} />
-                      {columnFilters?.has(col.name) ? <span className={styles.filterDot} /> : null}
+                      {columnFilters?.has(key) ? <span className={styles.filterDot} /> : null}
                     </button>
                   ) : null}
                   <span
                     className={styles.resizer}
-                    onMouseDown={(e) => startResize(e, col.name, width)}
+                    onMouseDown={(e) => startResize(e, key, width)}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
-                      autoFit(col.name)
+                      autoFit(key)
                     }}
                     onClick={(e) => e.stopPropagation()}
                     aria-hidden="true"
                   />
                 </th>
-              ))}
+                )
+              })}
             </tr>
           </thead>
           <tbody>
@@ -550,28 +593,29 @@ export function DataGrid({
                     {index + 1}
                   </td>
                   {displayColumns.map(({ col }) => {
-                    const value = row[col.name]
+                    const key = col.displayName
+                    const value = row[key]
                     const isNull = value === null || value === undefined
-                    const isEditing = editing?.index === index && editing.column === col.name
-                    const cellSelected = selectedCells.has(`${index}:${col.name}`)
+                    const isEditing = editing?.index === index && editing.column === key
+                    const cellSelected = selectedCells.has(`${index}:${key}`)
                     const cellStyle = cellSelected
                       ? {
                           background: 'var(--grid-row-selected)',
                           outline: '2px solid var(--color-accent)',
                           outlineOffset: '-2px',
                         }
-                      : selectedCol === col.name
+                      : selectedCol === key
                         ? { background: 'var(--grid-col-highlight)' }
                         : undefined
                     return (
                       <td
-                        key={col.name}
+                        key={key}
                         className={`${styles.td} ${isNull && !isEditing ? styles.null : ''}`}
                         style={cellStyle}
-                        onClick={(e) => onCellClick(e, index, col.name)}
+                        onClick={(e) => onCellClick(e, index, key)}
                         onContextMenu={(e) => cellMenu(e, row, value)}
                         onDoubleClick={() => {
-                          if (editable) setEditing({ index, column: col.name })
+                          if (editable) setEditing({ index, column: key })
                         }}
                       >
                         {isEditing ? (
@@ -579,8 +623,8 @@ export function DataGrid({
                             className={styles.editInput}
                             defaultValue={cellText(value)}
                             autoFocus
-                            onBlur={(e) => commitEdit(col.name, row, e.currentTarget)}
-                            onKeyDown={(e) => onEditKey(e, col.name, row)}
+                            onBlur={(e) => commitEdit(key, row, e.currentTarget)}
+                            onKeyDown={(e) => onEditKey(e, key, row)}
                           />
                         ) : isNull ? (
                           // Staged new rows show unset cells as empty (spec 2B), not "null".
@@ -602,7 +646,7 @@ export function DataGrid({
                   <tr key={`skel-${s}`} className={styles.skelRow} style={{ height: rowHeight }}>
                     <td className={styles.rowNum} />
                     {displayColumns.map(({ col }) => (
-                      <td key={col.name} className={styles.td}>
+                      <td key={col.displayName} className={styles.td}>
                         <span className={styles.skel} />
                       </td>
                     ))}
@@ -620,7 +664,7 @@ export function DataGrid({
         <FilterPopover
           key={filterPopover.col}
           colKey={filterPopover.col}
-          width={displayColumns.find((c) => c.col.name === filterPopover.col)?.width ?? 220}
+          width={displayColumns.find((c) => c.col.displayName === filterPopover.col)?.width ?? 220}
           anchor={{ x: filterPopover.x, y: filterPopover.y }}
           current={columnFilters?.get(filterPopover.col) ?? null}
           loadValues={() => onLoadDistinct(filterPopover.col)}

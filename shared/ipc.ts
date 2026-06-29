@@ -188,9 +188,36 @@ export interface QueryRequest {
 }
 
 export interface QueryColumn {
+  /** Original column name from the database (may repeat in a self-join). */
   name: string
+  /** Unique display/key name: "title", "title (2)", "title (3)". */
+  displayName: string
   dataType: string
   nullable?: boolean
+  /** Source table alias when the driver can resolve it (e.g. "mi2"). */
+  tableAlias?: string
+}
+
+/**
+ * Assign each column a unique `displayName`, disambiguating duplicate names
+ * (e.g. a self-join returning two `title` columns → "title", "title (2)").
+ * Drivers MUST call this so result rows can be keyed without collisions.
+ */
+export function generateDisplayNames(columns: QueryColumn[]): void {
+  const used = new Set<string>()
+  const seen = new Map<string, number>()
+  for (const c of columns) {
+    const count = (seen.get(c.name) ?? 0) + 1
+    seen.set(c.name, count)
+    let name = count === 1 ? c.name : `${c.name} (${count})`
+    let bump = count
+    while (used.has(name)) {
+      bump += 1
+      name = `${c.name} (${bump})`
+    }
+    used.add(name)
+    c.displayName = name
+  }
 }
 
 export interface QueryResult {

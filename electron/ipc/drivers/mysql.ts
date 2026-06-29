@@ -8,6 +8,7 @@ import type {
   TableInfo,
   TableType,
 } from '../../../shared/ipc'
+import { generateDisplayNames } from '../../../shared/ipc'
 import { type DatabaseDriver, type DriverConfig, nowMs, withTimeout } from './base'
 import { translateError } from './errors'
 
@@ -145,15 +146,24 @@ export class MySqlDriver implements DatabaseDriver {
     }
     this.currentThreadId = conn.threadId ?? null
     try {
-      const [resultRaw, fieldsRaw] = await conn.query(sql)
+      // rowsAsArray gives positional values so duplicate column names don't
+      // collide; we re-key by unique displayName.
+      const [resultRaw, fieldsRaw] = await conn.query({ sql, rowsAsArray: true })
       let columns: QueryColumn[] = []
       let rows: Record<string, unknown>[] = []
       let rowCount: number
 
       if (Array.isArray(resultRaw)) {
         const fields = (fieldsRaw ?? []) as FieldPacket[]
-        columns = fields.map((f) => ({ name: f.name, dataType: mysqlTypeName(f.type) }))
-        rows = resultRaw as unknown as Record<string, unknown>[]
+        columns = fields.map((f) => ({ name: f.name, displayName: f.name, dataType: mysqlTypeName(f.type) }))
+        generateDisplayNames(columns)
+        rows = (resultRaw as unknown as unknown[][]).map((vals) => {
+          const o: Record<string, unknown> = {}
+          columns.forEach((c, i) => {
+            o[c.displayName] = vals[i]
+          })
+          return o
+        })
         rowCount = rows.length
       } else {
         rowCount = (resultRaw as ResultSetHeader).affectedRows ?? 0
