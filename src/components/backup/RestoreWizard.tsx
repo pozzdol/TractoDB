@@ -12,6 +12,7 @@ interface Options {
   clean: boolean
   ifExists: boolean
   noOwner: boolean
+  noPrivileges: boolean
   extraArgs: string
 }
 
@@ -25,7 +26,10 @@ export function RestoreWizard() {
   const [options, setOptions] = useState<Options>({
     clean: false,
     ifExists: false,
-    noOwner: false,
+    // Default ON: production dumps reference roles/grants that rarely exist
+    // locally, so restores fail without these. (BUG 4)
+    noOwner: true,
+    noPrivileges: true,
     extraArgs: '',
   })
 
@@ -52,6 +56,7 @@ export function RestoreWizard() {
       clean: options.clean,
       ifExists: options.ifExists,
       noOwner: options.noOwner,
+      noPrivileges: options.noPrivileges,
       extraArgs: options.extraArgs,
     }
     setStep(3)
@@ -123,6 +128,11 @@ export function RestoreWizard() {
               <Check label="Clean (drop objects before recreate)" v={options.clean} on={(b) => set('clean', b)} />
               <Check label="Include IF EXISTS" v={options.ifExists} on={(b) => set('ifExists', b)} />
               <Check label="No owner" v={options.noOwner} on={(b) => set('noOwner', b)} />
+              <Check label="No privileges" v={options.noPrivileges} on={(b) => set('noPrivileges', b)} />
+              <p className={styles.hint}>
+                Recommended when restoring a production dump to a local database. Prevents errors
+                caused by missing roles or permission differences.
+              </p>
             </>
           )}
           {!isPg && (
@@ -141,7 +151,15 @@ export function RestoreWizard() {
         </div>
       )}
 
-      {step === 3 && <ProgressLog lines={lines} isRunning={isRunning} exitCode={exitCode} />}
+      {step === 3 && (
+        <ProgressLog
+          lines={lines}
+          isRunning={isRunning}
+          exitCode={exitCode}
+          operation="Restore"
+          database={target.database}
+        />
+      )}
     </Modal>
   )
 }

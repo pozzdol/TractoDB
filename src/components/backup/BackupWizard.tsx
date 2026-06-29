@@ -32,8 +32,10 @@ interface Options {
 const DEFAULT_OPTIONS: Options = {
   format: 'plain',
   compression: 6,
-  noOwner: false,
-  noPrivileges: false,
+  // Default ON for safer cross-environment dumps (restore on a machine without
+  // the production roles/grants). (BUG 4)
+  noOwner: true,
+  noPrivileges: true,
   ifExists: false,
   singleTransaction: true,
   routines: true,
@@ -338,6 +340,8 @@ export function BackupWizard() {
           exitCode={exitCode}
           summary={summary}
           completion={completion}
+          operation="Backup"
+          database={target.database}
         />
       )}
     </Modal>

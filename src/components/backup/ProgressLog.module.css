@@ -44,7 +44,14 @@
 }
 
 .status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: var(--text-sm);
+}
+
+.spacer {
+  flex: 1 1 auto;
 }
 
 .running {

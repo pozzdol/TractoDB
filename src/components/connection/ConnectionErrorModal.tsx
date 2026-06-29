@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -6,6 +7,7 @@ import { useUiStore } from '@/store/uiStore'
 import styles from './ConnectionErrorModal.module.css'
 
 export function ConnectionErrorModal() {
+  const [copied, setCopied] = useState(false)
   const connectionId = useUiStore((s) => s.connectionErrorId)
   const dismiss = useUiStore((s) => s.dismissConnectionError)
   const openConnectionForm = useUiStore((s) => s.openConnectionForm)
@@ -29,8 +31,21 @@ export function ConnectionErrorModal() {
         ]
 
   const fullError =
-    `Could not connect to "${config.name}"\n\n${message}\n\n` +
-    details.map((d) => `${d.label}: ${d.value}`).join('\n')
+    `TractoDB Connection Error\n` +
+    `Date: ${new Date().toISOString()}\n` +
+    `Connection: ${config.name}\n` +
+    (config.type === 'sqlite'
+      ? `File: ${config.filePath ?? ''}\n`
+      : `Host: ${config.host ?? ''}:${config.port ?? ''}\n` +
+        `Database: ${config.database ?? ''}\n` +
+        `User: ${config.username ?? ''}\n`) +
+    `\nError: ${message}`
+
+  function copyError(): void {
+    void navigator.clipboard.writeText(fullError)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   function editConnection(): void {
     dismiss()
@@ -44,8 +59,8 @@ export function ConnectionErrorModal() {
       onClose={dismiss}
       footer={
         <>
-          <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(fullError)}>
-            Copy Error
+          <Button variant="ghost" onClick={copyError}>
+            {copied ? 'Copied!' : 'Copy Error'}
           </Button>
           <span className={styles.spacer} />
           <Button variant="secondary" onClick={editConnection}>

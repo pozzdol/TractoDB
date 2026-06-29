@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { IconCopy } from '@tabler/icons-react'
+import { Button } from '@/components/ui/Button'
 import type { BackupProgress } from '@shared/ipc'
 import styles from './ProgressLog.module.css'
 
@@ -10,14 +12,43 @@ interface ProgressLogProps {
   summary?: string
   /** Completion line shown after a successful run (with table count + file size). */
   completion?: string
+  /** Operation + database — used to label the "Copy Error" payload on failure. */
+  operation?: 'Backup' | 'Restore'
+  database?: string
 }
 
-export function ProgressLog({ lines, isRunning, exitCode, summary, completion }: ProgressLogProps) {
+export function ProgressLog({
+  lines,
+  isRunning,
+  exitCode,
+  summary,
+  completion,
+  operation = 'Backup',
+  database,
+}: ProgressLogProps) {
   const endRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [lines, completion])
+
+  const failed = !isRunning && exitCode !== null && exitCode !== 0
+
+  function copyError(): void {
+    const errorLines = lines.filter((l) => l.isError)
+    const body = (errorLines.length > 0 ? errorLines : lines).map((l) => l.line).join('\n')
+    const text =
+      `TractoDB ${operation} Error\n` +
+      `Date: ${new Date().toISOString()}\n` +
+      `Operation: ${operation}\n` +
+      `Database: ${database ?? ''}\n` +
+      `Exit code: ${exitCode}\n\n` +
+      `--- Error output ---\n${body}`
+    void navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className={styles.wrap}>
@@ -45,6 +76,15 @@ export function ProgressLog({ lines, isRunning, exitCode, summary, completion }:
         ) : (
           <span className={styles.failed}>Exited with code {exitCode}</span>
         )}
+        {failed ? (
+          <>
+            <span className={styles.spacer} />
+            <Button variant="secondary" onClick={copyError}>
+              <IconCopy size={14} />
+              {copied ? 'Copied!' : 'Copy Error'}
+            </Button>
+          </>
+        ) : null}
       </div>
     </div>
   )
