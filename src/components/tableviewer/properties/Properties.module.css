@@ -60,6 +60,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  position: relative; /* stacking context so the sticky header clips rows */
 }
 
 .table {
@@ -71,15 +72,18 @@
 .table th {
   position: sticky;
   top: 0;
+  z-index: 2; /* above body cells so row content scrolls behind the header */
   text-align: left;
   padding: var(--space-2) var(--space-4);
   font-weight: var(--weight-medium);
   color: var(--color-text-secondary);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary); /* opaque — prevents bleed-through */
   border-bottom: var(--border-strong);
 }
 
 .table td {
+  position: relative;
+  z-index: 1; /* below the sticky header */
   padding: var(--space-2) var(--space-4);
   border-bottom: var(--border);
   color: var(--color-text-primary);
