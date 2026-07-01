@@ -22,6 +22,7 @@ export const IPC = {
     LIST_TABLES: 'schema:listTables',
     LIST_COLUMNS: 'schema:listColumns',
     GET_TABLE_DDL: 'schema:getTableDDL',
+    GET_FULL_DDL: 'schema:getFullDDL',
     GET_TABLE_INFO: 'schema:getTableInfo',
     GET_INDEXES: 'schema:getIndexes',
     GET_FOREIGN_KEYS: 'schema:getForeignKeys',
@@ -590,6 +591,7 @@ export interface TractoDbApi {
       table: string,
     ): Promise<IpcResponse<ColumnInfo[]>>
     getTableDDL(ref: TableRef): Promise<IpcResponse<string>>
+    getFullDDL(ref: TableRef): Promise<IpcResponse<string>>
     getTableInfo(ref: TableRef): Promise<IpcResponse<TableDetails>>
     getIndexes(ref: TableRef): Promise<IpcResponse<IndexInfo[]>>
     getForeignKeys(ref: TableRef): Promise<IpcResponse<ForeignKeyInfo[]>>

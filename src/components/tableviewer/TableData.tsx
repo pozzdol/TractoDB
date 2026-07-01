@@ -16,6 +16,7 @@ import { ContextMenu } from '@/components/ui/ContextMenu'
 import { api } from '@/store/ipcClient'
 import { useTabStore } from '@/store/tabStore'
 import { qualifiedName, quoteIdent } from '@/lib/sqlIdent'
+import type { ColumnFilter } from '@/lib/columnTypeGroups'
 import type { DatabaseType } from '@/types/connection'
 import type { QueryColumn } from '@/types/query'
 import type { TableTabProps } from './TableViewer'
@@ -49,6 +50,54 @@ function literal(v: unknown): string {
 function valEq(a: unknown, b: unknown): boolean {
   if ((a === null || a === undefined) && (b === null || b === undefined)) return true
   return String(a) === String(b)
+}
+
+/** Dialect-aware WHERE predicate for one typed column filter (BUG 10). */
+function filterSql(dbType: DatabaseType, col: string, f: ColumnFilter): string {
+  const q = quoteIdent(dbType, col)
+  const esc = (s: string): string => s.replace(/'/g, "''")
+  const textCast = dbType === 'mysql' ? `CAST(${q} AS CHAR)` : `${q}::text`
+  const numLit = (s: string): string => (s.trim() === '' || Number.isNaN(Number(s)) ? 'NULL' : String(Number(s)))
+  switch (f.kind) {
+    case 'values': {
+      if (f.values.length === 0) return '1 = 0'
+      const nonNull = f.values.filter((v) => v !== null && v !== undefined)
+      const sub: string[] = []
+      if (nonNull.length) sub.push(`${q} IN (${nonNull.map(literal).join(', ')})`)
+      if (f.values.length > nonNull.length) sub.push(`${q} IS NULL`)
+      return sub.length > 1 ? `(${sub.join(' OR ')})` : (sub[0] ?? '1 = 1')
+    }
+    case 'text':
+      switch (f.mode) {
+        case 'contains': return `${textCast} LIKE '%${esc(f.value)}%'`
+        case 'starts': return `${textCast} LIKE '${esc(f.value)}%'`
+        case 'ends': return `${textCast} LIKE '%${esc(f.value)}'`
+        case 'exact': return `${textCast} = '${esc(f.value)}'`
+        case 'keyExists': return `${q} ? '${esc(f.value)}'`
+        case 'null': return `${q} IS NULL`
+        case 'notNull': return `${q} IS NOT NULL`
+      }
+      return '1 = 1'
+    case 'numeric':
+      switch (f.mode) {
+        case 'between': return `${q} BETWEEN ${numLit(f.min)} AND ${numLit(f.max)}`
+        case 'gt': return `${q} > ${numLit(f.min)}`
+        case 'lt': return `${q} < ${numLit(f.max)}`
+        case 'eq': return `${q} = ${numLit(f.value)}`
+        case 'null': return `${q} IS NULL`
+        case 'notNull': return `${q} IS NOT NULL`
+      }
+      return '1 = 1'
+    case 'date':
+      switch (f.mode) {
+        case 'between': return `${q} >= '${esc(f.from)}' AND ${q} <= '${esc(f.to)}'`
+        case 'after': return `${q} >= '${esc(f.from)}'`
+        case 'before': return `${q} <= '${esc(f.to)}'`
+        case 'null': return `${q} IS NULL`
+        case 'notNull': return `${q} IS NOT NULL`
+      }
+      return '1 = 1'
+  }
 }
 
 function buildStatements(
@@ -151,7 +200,10 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
   const runPage = useCallback(
     async (query: string, offset: number): Promise<{ ok: boolean; error?: string }> => {
       const res = await api().query.execute(connectionId, query, database, offset, PAGE)
-      if (!res.success) return { ok: false, error: res.error }
+      if (!res.success) {
+        const error = res.code === 'SORT_NOT_SUPPORTED' ? 'This column type does not support sorting.' : res.error
+        return { ok: false, error }
+      }
       const data = res.data
       setColumns(data.columns)
       setTotalCount(data.totalCount)
@@ -264,7 +316,7 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
   }, [builtQuery, loading, isDirty, applyFilter])
 
   // ── Column header filters (Feature 5) ──────────────────────────────────────
-  const [columnFilters, setColumnFilters] = useState<Map<string, unknown[]>>(new Map())
+  const [columnFilters, setColumnFilters] = useState<Map<string, ColumnFilter>>(new Map())
   const [filtersMenu, setFiltersMenu] = useState<{ x: number; y: number } | null>(null)
 
   const loadDistinct = useCallback(
@@ -277,34 +329,29 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     [connectionId, database, qualified, dbType],
   )
 
-  function buildWhere(map: Map<string, unknown[]>): string {
-    const parts: string[] = []
-    for (const [col, vals] of map) {
-      const qid = quoteIdent(dbType, col)
-      if (vals.length === 0) {
-        parts.push('1 = 0') // nothing selected → no rows
-        continue
-      }
-      const nonNull = vals.filter((v) => v !== null && v !== undefined)
-      const sub: string[] = []
-      if (nonNull.length) sub.push(`${qid} IN (${nonNull.map(literal).join(', ')})`)
-      if (vals.length > nonNull.length) sub.push(`${qid} IS NULL`)
-      parts.push(sub.length > 1 ? `(${sub.join(' OR ')})` : (sub[0] ?? '1 = 1'))
-    }
-    return parts.join(' AND ')
+  function buildWhere(map: Map<string, ColumnFilter>): string {
+    return [...map].map(([col, f]) => filterSql(dbType, col, f)).join(' AND ')
   }
 
-  function applyFiltersMap(map: Map<string, unknown[]>): void {
+  function applyFiltersMap(map: Map<string, ColumnFilter>): void {
     setColumnFilters(map)
     const where = buildWhere(map)
     setClause('WHERE')
     setFilterText(where)
     requestApply(where ? buildClauseQuery('WHERE', qualified, where) : `SELECT * FROM ${qualified}`)
   }
-  function applyColumnFilter(colKey: string, values: unknown[]): void {
+  function applyColumnFilter(colKey: string, filter: ColumnFilter): void {
     const next = new Map(columnFilters)
-    next.set(colKey, values)
+    next.set(colKey, filter)
     applyFiltersMap(next)
+  }
+
+  // BUG 11 Part B: sort a JSONB column by its text representation via the SQL bar.
+  function sortAsText(colKey: string): void {
+    const expr = `${quoteIdent(dbType, colKey)}::text`
+    setClause('ORDER BY')
+    setFilterText(expr)
+    requestApply(buildClauseQuery('ORDER BY', qualified, expr))
   }
   function clearColumnFilter(colKey: string): void {
     const next = new Map(columnFilters)
@@ -663,6 +710,7 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         onLoadDistinct={loadDistinct}
         onApplyColumnFilter={applyColumnFilter}
         onClearColumnFilter={clearColumnFilter}
+        onSortAsText={dbType === 'postgresql' ? sortAsText : undefined}
       />
 
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
@@ -729,8 +777,8 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
           x={filtersMenu.x}
           y={filtersMenu.y}
           onClose={() => setFiltersMenu(null)}
-          items={[...columnFilters.entries()].map(([col, vals]) => ({
-            label: `${col} (${vals.length})`,
+          items={[...columnFilters.keys()].map((col) => ({
+            label: col,
             icon: <IconX size={14} />,
             onClick: () => clearColumnFilter(col),
           }))}

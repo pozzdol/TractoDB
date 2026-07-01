@@ -32,6 +32,7 @@ const api: TractoDbApi = {
     listColumns: (connectionId, database, table) =>
       ipcRenderer.invoke(IPC.SCHEMA.LIST_COLUMNS, connectionId, database, table),
     getTableDDL: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_TABLE_DDL, ref),
+    getFullDDL: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_FULL_DDL, ref),
     getTableInfo: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_TABLE_INFO, ref),
     getIndexes: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_INDEXES, ref),
     getForeignKeys: (ref) => ipcRenderer.invoke(IPC.SCHEMA.GET_FOREIGN_KEYS, ref),

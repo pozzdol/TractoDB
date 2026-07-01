@@ -83,6 +83,174 @@ async function getTableDDL(ref: TableRef): Promise<string> {
   return `CREATE TABLE ${q} (\n${lines.join(',\n')}\n);`
 }
 
+// ─── Full DDL script (BUG 9) ─────────────────────────────────────────────────
+
+function ddlHeader(title: string): string {
+  return `-- ─────────────────────────────────────────\n-- ${title}\n-- ─────────────────────────────────────────`
+}
+function withSemi(sql: string): string {
+  const s = sql.trimEnd()
+  return s.endsWith(';') ? s : `${s};`
+}
+
+async function pgFullDDL(id: string, sch: string, table: string): Promise<string> {
+  const q = qualify('postgresql', sch, table)
+  const esc = escapeLiteral
+  const relOid = `(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = '${esc(table)}' AND n.nspname = '${esc(sch)}')`
+  const sections: string[] = []
+
+  // 1. CREATE TABLE (columns only — constraints come as ALTERs below).
+  const cols = await run(
+    id,
+    `SELECT column_name AS name, data_type AS dt, character_maximum_length AS len, is_nullable AS nn, column_default AS def
+     FROM information_schema.columns
+     WHERE table_schema = '${esc(sch)}' AND table_name = '${esc(table)}'
+     ORDER BY ordinal_position`,
+  )
+  const colLines = cols.map((c) => {
+    const len = num(c.len)
+    const dt = len ? `${String(c.dt)}(${len})` : String(c.dt)
+    const notNull = c.nn === 'NO' ? ' NOT NULL' : ''
+    const def = c.def ? ` DEFAULT ${String(c.def)}` : ''
+    return `  ${quoteId('postgresql', String(c.name))} ${dt}${notNull}${def}`
+  })
+  sections.push(`${ddlHeader('Table')}\nCREATE TABLE ${q} (\n${colLines.join(',\n')}\n);`)
+
+  // 2. Sequences owned by this table's serial columns (heuristic: <table>_%_seq).
+  const seqs = await run(
+    id,
+    `SELECT sequence_name AS n, sequence_schema AS s FROM information_schema.sequences
+     WHERE sequence_schema = '${esc(sch)}' AND sequence_name LIKE '${esc(table)}\\_%'`,
+  )
+  if (seqs.length) {
+    sections.push(
+      `${ddlHeader('Sequences')}\n${seqs
+        .map((r) => `CREATE SEQUENCE IF NOT EXISTS ${quoteId('postgresql', String(r.s))}.${quoteId('postgresql', String(r.n))};`)
+        .join('\n')}`,
+    )
+  }
+
+  // 3. Indexes (excluding constraint-backed ones).
+  const idx = await run(
+    id,
+    `SELECT indexdef AS def FROM pg_indexes
+     WHERE schemaname = '${esc(sch)}' AND tablename = '${esc(table)}'
+       AND indexname NOT IN (
+         SELECT constraint_name FROM information_schema.table_constraints
+         WHERE table_schema = '${esc(sch)}' AND table_name = '${esc(table)}')`,
+  )
+  if (idx.length) sections.push(`${ddlHeader('Indexes')}\n${idx.map((r) => withSemi(String(r.def))).join('\n')}`)
+
+  // 4–7. Constraints (primary, foreign, check, unique) via pg_get_constraintdef.
+  const cons = await run(
+    id,
+    `SELECT conname AS name, pg_get_constraintdef(oid) AS def, contype AS t
+     FROM pg_constraint WHERE conrelid = ${relOid}
+     ORDER BY CASE contype WHEN 'p' THEN 1 WHEN 'f' THEN 2 WHEN 'c' THEN 3 WHEN 'u' THEN 4 ELSE 5 END`,
+  )
+  const conSection = (label: string, t: string): void => {
+    const list = cons.filter((c) => c.t === t)
+    if (!list.length) return
+    sections.push(
+      `${ddlHeader(label)}\n${list
+        .map((c) => `ALTER TABLE ${q} ADD CONSTRAINT ${quoteId('postgresql', String(c.name))} ${String(c.def)};`)
+        .join('\n')}`,
+    )
+  }
+  conSection('Primary Key', 'p')
+  conSection('Foreign Keys', 'f')
+  conSection('Check Constraints', 'c')
+  conSection('Unique Constraints', 'u')
+
+  // 8. Triggers.
+  const trg = await run(
+    id,
+    `SELECT pg_get_triggerdef(oid) AS def FROM pg_trigger WHERE tgrelid = ${relOid} AND NOT tgisinternal`,
+  )
+  if (trg.length) sections.push(`${ddlHeader('Triggers')}\n${trg.map((r) => withSemi(String(r.def))).join('\n')}`)
+
+  // 9. Functions executed by those triggers.
+  const funcNames = new Set<string>()
+  for (const r of trg) {
+    const m = /EXECUTE (?:PROCEDURE|FUNCTION)\s+([^\s(]+)/i.exec(String(r.def))
+    if (m?.[1]) funcNames.add(m[1].split('.').pop()!.replace(/"/g, ''))
+  }
+  const fnDefs: string[] = []
+  for (const fn of funcNames) {
+    const rows = await run(
+      id,
+      `SELECT pg_get_functiondef(p.oid) AS def FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE p.proname = '${esc(fn)}' AND n.nspname = '${esc(sch)}'`,
+    ).catch(() => [])
+    for (const r of rows) fnDefs.push(withSemi(String(r.def)))
+  }
+  if (fnDefs.length) sections.push(`${ddlHeader('Functions')}\n${fnDefs.join('\n\n')}`)
+
+  return sections.join('\n\n')
+}
+
+async function getFullDDL(ref: TableRef): Promise<string> {
+  const { connectionId: id, schema, table } = ref
+  const type = connectionManager.getConfig(id).type
+  const createTable = await getTableDDL(ref)
+
+  if (type === 'postgresql') {
+    return pgFullDDL(id, schema ?? 'public', table)
+  }
+
+  if (type === 'sqlite') {
+    const esc = escapeLiteral
+    const out = [
+      '-- SQLite: constraints and foreign keys are defined inline in CREATE TABLE',
+      `${ddlHeader('Table')}\n${withSemi(createTable)}`,
+    ]
+    const idx = await run(
+      id,
+      `SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = '${esc(table)}' AND sql IS NOT NULL`,
+    )
+    if (idx.length) out.push(`${ddlHeader('Indexes')}\n${idx.map((r) => withSemi(String(r.sql))).join('\n')}`)
+    const trg = await run(
+      id,
+      `SELECT sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = '${esc(table)}'`,
+    )
+    if (trg.length) out.push(`${ddlHeader('Triggers')}\n${trg.map((r) => withSemi(String(r.sql))).join('\n')}`)
+    return out.join('\n\n')
+  }
+
+  // MySQL: SHOW CREATE TABLE already includes indexes + constraints + FKs.
+  const db = schema ?? connectionManager.getConfig(id).database ?? ''
+  const esc = escapeLiteral
+  const out = [`${ddlHeader('Table')}\n${withSemi(createTable)}`]
+  const trg = await run(
+    id,
+    `SELECT TRIGGER_NAME AS name, ACTION_TIMING AS timing, EVENT_MANIPULATION AS event, ACTION_STATEMENT AS body
+     FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = '${esc(db)}' AND EVENT_OBJECT_TABLE = '${esc(table)}'`,
+  )
+  if (trg.length) {
+    out.push(
+      `${ddlHeader('Triggers')}\n${trg
+        .map(
+          (r) =>
+            `DELIMITER $$\nCREATE TRIGGER \`${String(r.name)}\` ${String(r.timing)} ${String(r.event)} ON \`${table}\` FOR EACH ROW ${String(r.body)}$$\nDELIMITER ;`,
+        )
+        .join('\n\n')}`,
+    )
+  }
+  const procs = await run(
+    id,
+    `SELECT ROUTINE_DEFINITION AS body FROM information_schema.ROUTINES
+     WHERE ROUTINE_SCHEMA = '${esc(db)}' AND ROUTINE_DEFINITION LIKE '%${esc(table)}%'`,
+  )
+  if (procs.length) {
+    out.push(
+      `${ddlHeader('Functions / Procedures')}\n${procs
+        .map((r) => `DELIMITER $$\n${String(r.body)}\n$$\nDELIMITER ;`)
+        .join('\n\n')}`,
+    )
+  }
+  return out.join('\n\n')
+}
+
 // ─── Info ───────────────────────────────────────────────────────────────────
 
 async function getTableInfo(ref: TableRef): Promise<TableDetails> {
@@ -371,6 +539,7 @@ function handle<T>(channel: string, run: (ref: TableRef) => Promise<T>): void {
 
 export function registerTableMetaHandlers(): void {
   handle(IPC.SCHEMA.GET_TABLE_DDL, getTableDDL)
+  handle(IPC.SCHEMA.GET_FULL_DDL, getFullDDL)
   handle(IPC.SCHEMA.GET_TABLE_INFO, getTableInfo)
   handle(IPC.SCHEMA.GET_INDEXES, getIndexes)
   handle(IPC.SCHEMA.GET_FOREIGN_KEYS, getForeignKeys)

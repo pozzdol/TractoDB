@@ -1,4 +1,5 @@
 .gridWrap {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -233,4 +234,20 @@ tbody tr {
   50% {
     opacity: 0.4;
   }
+}
+
+/* Transient message when a JSONB/array column sort is blocked (BUG 11). */
+.sortMsg {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: 80%;
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-inverse);
+  background-color: var(--color-warning);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
 }

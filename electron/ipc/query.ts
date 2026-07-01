@@ -13,7 +13,12 @@ export function registerQueryHandlers(): void {
         }),
       )
     } catch (err) {
-      return ipcError(describeError(err))
+      const msg = describeError(err)
+      // Sort on an unorderable type (JSONB / incompatible collation). (BUG 11 Part C)
+      const code = /could not identify an ordering operator|Illegal mix of collations/i.test(msg)
+        ? 'SORT_NOT_SUPPORTED'
+        : undefined
+      return ipcError(msg, code)
     }
   })
 

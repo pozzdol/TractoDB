@@ -22,6 +22,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/ContextMenu'
 import { Button } from '@/components/ui/Button'
 import { ROW_HEIGHT_PRESETS, useGridLayout } from '@/hooks/useGridLayout'
 import { type FmtColumn, toJSON, toMarkdown, toSQL, toTSV, tsvCell } from '@/lib/gridFormat'
+import { type ColumnFilter, isSortable } from '@/lib/columnTypeGroups'
 import type { QueryColumn } from '@/types/query'
 import { FilterPopover } from './FilterPopover'
 import styles from './DataGrid.module.css'
@@ -52,11 +53,13 @@ interface DataGridProps {
   toolbarExtra?: ReactNode
   /** Ctrl+V within the grid (paste is staged-edit only). Copy is handled here. */
   onPaste?: () => void
-  /** Per-column filters (Feature 5): active filter values keyed by column. */
-  columnFilters?: Map<string, unknown[]>
+  /** Per-column filters: active filter descriptor keyed by column displayName. */
+  columnFilters?: Map<string, ColumnFilter>
   onLoadDistinct?: (colKey: string) => Promise<unknown[]>
-  onApplyColumnFilter?: (colKey: string, values: unknown[]) => void
+  onApplyColumnFilter?: (colKey: string, filter: ColumnFilter) => void
   onClearColumnFilter?: (colKey: string) => void
+  /** JSONB "sort as text" link (BUG 11): add ORDER BY col::text to the SQL bar. */
+  onSortAsText?: (colKey: string) => void
 }
 
 // Per-row marker (Table Viewer staged changes): read from row['__state'].
@@ -107,6 +110,7 @@ export function DataGrid({
   onLoadDistinct,
   onApplyColumnFilter,
   onClearColumnFilter,
+  onSortAsText,
 }: DataGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -123,6 +127,17 @@ export function DataGrid({
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
   const [filterPopover, setFilterPopover] = useState<{ col: string; x: number; y: number } | null>(null)
+  const [sortMsg, setSortMsg] = useState<string | null>(null)
+
+  const dataTypeByKey = useMemo(
+    () => new Map(columns.map((c) => [c.displayName, c.dataType])),
+    [columns],
+  )
+  useEffect(() => {
+    if (!sortMsg) return
+    const t = setTimeout(() => setSortMsg(null), 3500)
+    return () => clearTimeout(t)
+  }, [sortMsg])
 
   const ROW_NUM_WIDTH = 40 // fixed row-number column, not resizable/reorderable
 
@@ -330,6 +345,14 @@ export function DataGrid({
   }, [selectedRows, selectedCells, sortedRows, onSelectionChange])
 
   function toggleSort(column: string): void {
+    // JSONB/array columns can't be ordered directly (BUG 11 Part A).
+    const dt = dataTypeByKey.get(column)
+    if (dt && !isSortable(dt)) {
+      setSortMsg(
+        'JSONB and array columns cannot be sorted directly. Use the SQL bar to write a custom ORDER BY expression.',
+      )
+      return
+    }
     setSort((prev) =>
       prev?.column === column
         ? prev.dir === 'asc'
@@ -664,12 +687,13 @@ export function DataGrid({
         <FilterPopover
           key={filterPopover.col}
           colKey={filterPopover.col}
+          dataType={dataTypeByKey.get(filterPopover.col) ?? ''}
           width={displayColumns.find((c) => c.col.displayName === filterPopover.col)?.width ?? 220}
           anchor={{ x: filterPopover.x, y: filterPopover.y }}
           current={columnFilters?.get(filterPopover.col) ?? null}
           loadValues={() => onLoadDistinct(filterPopover.col)}
-          onApply={(vals) => {
-            onApplyColumnFilter?.(filterPopover.col, vals)
+          onApply={(filter) => {
+            onApplyColumnFilter?.(filterPopover.col, filter)
             setFilterPopover(null)
           }}
           onClear={() => {
@@ -677,8 +701,17 @@ export function DataGrid({
             setFilterPopover(null)
           }}
           onClose={() => setFilterPopover(null)}
+          onSortAsText={
+            onSortAsText
+              ? () => {
+                  onSortAsText(filterPopover.col)
+                  setFilterPopover(null)
+                }
+              : undefined
+          }
         />
       ) : null}
+      {sortMsg ? <div className={styles.sortMsg} role="status">{sortMsg}</div> : null}
     </div>
   )
 }

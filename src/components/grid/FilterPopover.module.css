@@ -81,3 +81,75 @@
 .spacer {
   flex: 1 1 auto;
 }
+
+/* ─── Typed filter forms (JSON / numeric / date / large) ─── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.formTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.textInput,
+.eqInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.textInput:disabled {
+  opacity: 0.5;
+}
+
+.eqInput {
+  height: 22px;
+  width: 90px;
+  flex: 0 0 auto;
+  margin-left: var(--space-2);
+}
+
+.modes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.inlineLabel {
+  flex: 0 0 36px;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.sortLink {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  color: var(--color-accent-text);
+  text-decoration: underline;
+}

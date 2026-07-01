@@ -18,7 +18,7 @@ export function PropertiesDDL({ connectionId, database, schema, table }: TableTa
   useEffect(() => {
     let cancelled = false
     void api()
-      .schema.getTableDDL({ connectionId, database, schema, table })
+      .schema.getFullDDL({ connectionId, database, schema, table })
       .then((r) => {
         if (cancelled) return
         if (r.success) setDdl(r.data)
@@ -34,6 +34,8 @@ export function PropertiesDDL({ connectionId, database, schema, table }: TableTa
   return (
     <div className={styles.content}>
       <div className={styles.copyBar}>
+        <span className={styles.ddlSummary}>{ddlSummary(ddl)}</span>
+        <span style={{ flex: 1 }} />
         <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(ddl)}>
           <IconCopy size={14} />
           Copy
@@ -46,4 +48,19 @@ export function PropertiesDDL({ connectionId, database, schema, table }: TableTa
       </div>
     </div>
   )
+}
+
+/** Count assembled sections for the "Complete DDL — …" indicator (BUG 9). */
+function ddlSummary(ddl: string): string {
+  if (!ddl) return ''
+  const count = (re: RegExp): number => (ddl.match(re) ?? []).length
+  const parts: string[] = ['CREATE TABLE']
+  const n = (num: number, one: string, many: string): void => {
+    if (num > 0) parts.push(`${num} ${num === 1 ? one : many}`)
+  }
+  n(count(/\bCREATE (?:UNIQUE )?INDEX\b/gi), 'index', 'indexes')
+  n(count(/\bADD CONSTRAINT\b/gi), 'constraint', 'constraints')
+  n(count(/\bCREATE TRIGGER\b/gi), 'trigger', 'triggers')
+  n(count(/\bCREATE (?:OR REPLACE )?FUNCTION\b/gi), 'function', 'functions')
+  return `Complete DDL — includes ${parts.join(' + ')}`
 }
