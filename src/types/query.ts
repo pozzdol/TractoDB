@@ -9,10 +9,7 @@ export type {
 
 import type { QueryResult } from '@shared/ipc'
 
-/** A single result row — column name → value. */
-export type QueryRow = Record<string, unknown>
-
-export interface QueryError {
+interface QueryError {
   message: string
   code?: string
 }

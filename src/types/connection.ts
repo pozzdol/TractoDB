@@ -24,7 +24,7 @@ import type { DatabaseNode } from './schema'
  * icon colour. `colorVar` references a CSS custom property from DESIGN.md, so
  * components can use it for the (dynamic) icon fill.
  */
-export interface DatabaseTypeMeta {
+interface DatabaseTypeMeta {
   type: DatabaseType
   label: string
   defaultPort?: number
