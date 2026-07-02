@@ -16,7 +16,7 @@ export function tsvCell(v: unknown): string {
 }
 
 /** SQL literal: NULL/number/boolean raw; Date/object/string quoted + escaped. */
-export function sqlValue(v: unknown): string {
+function sqlValue(v: unknown): string {
   if (v === null || v === undefined) return 'NULL'
   if (typeof v === 'number') return String(v)
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
