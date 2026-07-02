@@ -20,6 +20,17 @@
   color: var(--color-warning);
 }
 
+/* Redis key-type badge in the data view header (BUG: Redis key viewer). */
+.redisBadge {
+  padding: 1px var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--color-accent-text);
+  background-color: var(--color-accent-subtle);
+  border-radius: var(--radius-sm);
+}
+
 .message {
   padding: var(--space-5);
   font-size: var(--text-sm);

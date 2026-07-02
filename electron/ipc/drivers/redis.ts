@@ -158,6 +158,85 @@ export class RedisDriver implements DatabaseDriver {
     // Redis commands return quickly; there's nothing meaningful to cancel in V1.
   }
 
+  /**
+   * Fetch a key's value shaped as a table (BUG: Redis key viewer). `keyName`
+   * may be an exact key (→ per-type value) or a prefix group (→ key listing).
+   * The `notice` field carries the type badge (STRING/HASH/…/GROUP/NONE).
+   */
+  async getRedisKeyValue(database: string, keyName: string): Promise<QueryResult> {
+    const started = nowMs()
+    const client = this.require()
+    await client.select(this.dbIndex(database))
+    try {
+      const type = await client.type(keyName)
+      const base = await this.readKey(client, database, keyName, type)
+      return { ...base.result, notice: base.notice, durationMs: nowMs() - started, sql: `TYPE ${keyName}` }
+    } catch (err) {
+      throw translateError(err, 'redis')
+    } finally {
+      await client.select(this.dbIndex())
+    }
+  }
+
+  private async readKey(
+    client: Redis,
+    database: string,
+    key: string,
+    type: string,
+  ): Promise<{ result: Pick<QueryResult, 'columns' | 'rows' | 'rowCount'>; notice: string }> {
+    const cols = (...names: string[]) => names.map((n) => ({ name: n, displayName: n, dataType: 'string' }))
+    const table = (columns: QueryResult['columns'], rows: Record<string, unknown>[]) => ({
+      result: { columns, rows, rowCount: rows.length },
+    })
+
+    switch (type) {
+      case 'string': {
+        const value = stringify(await client.get(key))
+        return { ...table(cols('key', 'value'), [{ key, value }]), notice: 'string' }
+      }
+      case 'hash': {
+        const h = await client.hgetall(key)
+        const rows = Object.entries(h).map(([field, value]) => ({ field, value: stringify(value) }))
+        return { ...table(cols('field', 'value'), rows), notice: 'hash' }
+      }
+      case 'list': {
+        const items = await client.lrange(key, 0, 999)
+        const rows = items.map((value, index) => ({ index, value: stringify(value) }))
+        return { ...table(cols('index', 'value'), rows), notice: 'list' }
+      }
+      case 'set': {
+        const members = await client.smembers(key)
+        const rows = members.map((member) => ({ member: stringify(member) }))
+        return { ...table(cols('member'), rows), notice: 'set' }
+      }
+      case 'zset': {
+        const flat = await client.zrange(key, 0, 999, 'WITHSCORES')
+        const rows: Record<string, unknown>[] = []
+        for (let i = 0; i < flat.length; i += 2) rows.push({ member: stringify(flat[i]), score: stringify(flat[i + 1]) })
+        return { ...table(cols('member', 'score'), rows), notice: 'zset' }
+      }
+      case 'stream': {
+        const entries = (await client.xrange(key, '-', '+', 'COUNT', 100)) as [string, string[]][]
+        const rows = entries.map(([id, fv]) => {
+          const fields: Record<string, string> = {}
+          for (let i = 0; i < fv.length; i += 2) fields[fv[i] ?? ''] = fv[i + 1] ?? ''
+          return { id, fields: JSON.stringify(fields) }
+        })
+        return { ...table(cols('id', 'fields'), rows), notice: 'stream' }
+      }
+      default: {
+        // No exact key — treat keyName as a prefix group and list its keys.
+        const groupKeys = await this.scanKeys(database, `${key}:*`, 100)
+        if (groupKeys.length === 0) {
+          return { ...table(cols('key'), []), notice: 'none' }
+        }
+        const rows: Record<string, unknown>[] = []
+        for (const k of groupKeys) rows.push({ key: k, type: await client.type(k) })
+        return { ...table(cols('key', 'type'), rows), notice: 'group' }
+      }
+    }
+  }
+
   /** Map a representative key's Redis type to pseudo-columns (TASKS.md Phase 2.5). */
   private async describeStructure(
     client: Redis,

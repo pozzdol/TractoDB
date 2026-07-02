@@ -105,4 +105,17 @@ export function registerSchemaHandlers(): void {
       }
     },
   )
+
+  ipcMain.handle(
+    IPC.REDIS.GET_KEY_VALUE,
+    async (_e, connectionId: string, database: string, keyName: string) => {
+      try {
+        const driver = connectionManager.getDriver(connectionId)
+        if (!driver.getRedisKeyValue) throw new Error('This connection is not a Redis connection.')
+        return ipcSuccess(await driver.getRedisKeyValue(database, keyName))
+      } catch (err) {
+        return ipcError(describeError(err))
+      }
+    },
+  )
 }

@@ -36,6 +36,8 @@ export interface DatabaseDriver {
   listColumns(database: string, table: string): Promise<ColumnInfo[]>
   /** Best-effort cancellation of the in-flight query. No-op where unsupported. */
   cancel(): Promise<void>
+  /** Redis only: fetch a key's value (or a prefix group's key list) as a table. */
+  getRedisKeyValue?(database: string, keyName: string): Promise<QueryResult>
 }
 
 /** Factory input — a connection config plus the transiently-held password. */

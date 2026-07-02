@@ -70,6 +70,10 @@ const api: TractoDbApi = {
     delete: (id) => ipcRenderer.invoke(IPC.SAVED_QUERY.DELETE, id),
     rename: (id, name) => ipcRenderer.invoke(IPC.SAVED_QUERY.RENAME, id, name),
   },
+  redis: {
+    getKeyValue: (connectionId, database, keyName) =>
+      ipcRenderer.invoke(IPC.REDIS.GET_KEY_VALUE, connectionId, database, keyName),
+  },
   backup: {
     startBackup: (config) => ipcRenderer.invoke(IPC.BACKUP.START_BACKUP, config),
     startRestore: (config) => ipcRenderer.invoke(IPC.BACKUP.START_RESTORE, config),

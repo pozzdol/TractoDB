@@ -57,6 +57,9 @@ export const IPC = {
     DELETE: 'savedQuery:delete',
     RENAME: 'savedQuery:rename',
   },
+  REDIS: {
+    GET_KEY_VALUE: 'redis:getKeyValue',
+  },
   DIALOG: {
     OPEN: 'dialog:open',
     SAVE: 'dialog:save',
@@ -633,6 +636,9 @@ export interface TractoDbApi {
     save(query: SavedQuery): Promise<IpcResponse<SavedQuery>>
     delete(id: string): Promise<IpcResponse<{ deleted: string }>>
     rename(id: string, name: string): Promise<IpcResponse<SavedQuery>>
+  }
+  redis: {
+    getKeyValue(connectionId: string, database: string, keyName: string): Promise<IpcResponse<QueryResult>>
   }
   backup: {
     startBackup(config: BackupConfig): Promise<IpcResponse<void>>

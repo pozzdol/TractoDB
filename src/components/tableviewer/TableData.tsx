@@ -157,6 +157,7 @@ function dirtySummary(c: { modified: number; new: number; deleted: number }): st
 
 export function TableData({ tabId, connectionId, database, schema, table, dbType, readOnly }: TableTabProps) {
   const qualified = qualifiedName(dbType, schema, table)
+  const isRedis = dbType === 'redis'
   const setTabDirty = useTabStore((s) => s.setTabDirty)
 
   const [columns, setColumns] = useState<QueryColumn[]>([])
@@ -167,6 +168,7 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [redisType, setRedisType] = useState<string | null>(null) // key type badge (Redis)
 
   // Selection mirrored from the grid (row objects carry __rowId).
   const [selRows, setSelRows] = useState<Row[]>([])
@@ -220,6 +222,25 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
     [connectionId, database, pkColumn],
   )
 
+  // Redis keys aren't SQL tables — fetch the value via Redis commands, not SELECT.
+  async function loadRedisKeyData(keyName: string, isCancelled: () => boolean): Promise<void> {
+    const res = await api().redis.getKeyValue(connectionId, database, keyName)
+    if (isCancelled()) return
+    if (!res.success) {
+      setError(res.error)
+      setLoading(false)
+      return
+    }
+    const data = res.data
+    setColumns(data.columns)
+    setRedisType(data.notice ?? null)
+    setPkColumn(null)
+    setTotalCount(data.rowCount)
+    setHasMore(false)
+    setEditRows(data.rows.map((r, i): EditRow => ({ rowId: `idx:${i}`, original: r, current: r, state: 'unchanged' })))
+    setLoading(false)
+  }
+
   const reload = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -238,6 +259,10 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
       setLoading(true)
       setError(null)
       setEditRows([])
+      if (isRedis) {
+        await loadRedisKeyData(table, () => cancelled)
+        return
+      }
       const cols = await api().schema.listColumns(connectionId, database, schema ? `${schema}.${table}` : table)
       if (cancelled) return
       const pk = cols.success ? (cols.data.find((c) => c.isPrimaryKey)?.name ?? null) : null
@@ -580,8 +605,15 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
 
   if (loading) return <div className={styles.message}>Loading…</div>
   if (error) return <div className={styles.error}>{error}</div>
+  if (isRedis && redisType === 'none')
+    return <div className={styles.message}>Key does not exist or has expired</div>
 
   const loadedCount = editRows.filter((r) => r.state !== 'new').length
+  const redisToolbar = (
+    <div className={styles.ops}>
+      <span className={styles.ro}>Redis key — read only view</span>
+    </div>
+  )
   const toolbar = (
     <div className={styles.ops}>
       <Button variant="ghost" className={styles.opBtn} title="Add row" aria-label="Add row" disabled={!editable} onClick={addRow}>
@@ -654,19 +686,21 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
 
   return (
     <div className={styles.wrap}>
-      <ColumnSqlBar
-        clause={clause}
-        value={filterText}
-        builtQuery={builtQuery}
-        columns={columnNames}
-        error={filterError}
-        loading={applying}
-        onClauseChange={setClause}
-        onChange={setFilterText}
-        onApply={() => requestApply(builtQuery)}
-        onClear={clearFilter}
-      />
-      {isDirty ? (
+      {!isRedis ? (
+        <ColumnSqlBar
+          clause={clause}
+          value={filterText}
+          builtQuery={builtQuery}
+          columns={columnNames}
+          error={filterError}
+          loading={applying}
+          onClauseChange={setClause}
+          onChange={setFilterText}
+          onApply={() => requestApply(builtQuery)}
+          onClear={clearFilter}
+        />
+      ) : null}
+      {!isRedis && isDirty ? (
         <div className={styles.saveBar} role="status">
           <span className={styles.saveMsg}>
             <IconAlertTriangle size={14} />
@@ -684,13 +718,18 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
       ) : null}
 
       <div className={styles.statusBar}>
-        {totalCount !== undefined
-          ? hasMore
-            ? `Showing ${loadedCount} of ${totalCount.toLocaleString()} rows`
-            : `${editRows.length.toLocaleString()} rows`
-          : `${editRows.length} rows`}
-        {readOnly ? <span className={styles.ro}>read-only</span> : null}
-        {!readOnly && !pkColumn ? <span className={styles.ro}>no primary key — editing disabled</span> : null}
+        {isRedis && redisType ? <span className={styles.redisBadge}>{redisType.toUpperCase()}</span> : null}
+        {isRedis
+          ? `${editRows.length} ${redisType === 'group' ? 'keys' : 'rows'}`
+          : totalCount !== undefined
+            ? hasMore
+              ? `Showing ${loadedCount} of ${totalCount.toLocaleString()} rows`
+              : `${editRows.length.toLocaleString()} rows`
+            : `${editRows.length} rows`}
+        {!isRedis && readOnly ? <span className={styles.ro}>read-only</span> : null}
+        {!isRedis && !readOnly && !pkColumn ? (
+          <span className={styles.ro}>no primary key — editing disabled</span>
+        ) : null}
       </div>
 
       <DataGrid
@@ -700,17 +739,17 @@ export function TableData({ tabId, connectionId, database, schema, table, dbType
         hasMore={hasMore}
         isLoadingMore={loadingMore}
         onLoadMore={() => void loadMore()}
-        editable={editable}
+        editable={editable && !isRedis}
         onEditCommit={onEditCommit}
-        tableName={qualified}
+        tableName={isRedis ? undefined : qualified}
         onSelectionChange={onSelectionChange}
-        toolbarExtra={toolbar}
-        onPaste={() => void handlePaste()}
+        toolbarExtra={isRedis ? redisToolbar : toolbar}
+        onPaste={isRedis ? undefined : () => void handlePaste()}
         columnFilters={columnFilters}
-        onLoadDistinct={loadDistinct}
-        onApplyColumnFilter={applyColumnFilter}
-        onClearColumnFilter={clearColumnFilter}
-        onSortAsText={dbType === 'postgresql' ? sortAsText : undefined}
+        onLoadDistinct={isRedis ? undefined : loadDistinct}
+        onApplyColumnFilter={isRedis ? undefined : applyColumnFilter}
+        onClearColumnFilter={isRedis ? undefined : clearColumnFilter}
+        onSortAsText={!isRedis && dbType === 'postgresql' ? sortAsText : undefined}
       />
 
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
