@@ -73,12 +73,11 @@
   --transition-slow: 250ms ease;
 
   /* ─── Database type colors (DESIGN.md § Database Type Colors) ─────── */
+  /* V1 types only; MongoDB/MSSQL colors land with their drivers in v2. */
   --db-postgresql: #336791;
   --db-mysql: #e48e00;
   --db-sqlite: #1d9e75;
   --db-redis: #dc382d;
-  --db-mongodb: #47a248;
-  --db-mssql: #cc2927;
 
   /* ─── Connection status dots (DESIGN.md § Status Indicators) ──────── */
   --status-connected: #28c840;
