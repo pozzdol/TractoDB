@@ -39,10 +39,14 @@ build/*
 !build/.gitkeep
 !build/deb-after-install.sh
 
-# ─── Docs (keep folder, ignore generated screenshots) ─────────────────────────
+# ─── Docs (keep folder + README assets, ignore working screenshots) ───────────
 docs/*
 !docs/.gitkeep
-!docs/screenshot.png
+!docs/banner.png
+!docs/screenshot-query.png
+!docs/screenshot-data.png
+!docs/screenshot-properties.png
+!docs/screenshot-light.png
 
 # ─── Environment ──────────────────────────────────────────────────────────────
 .env
