@@ -208,29 +208,6 @@ bun run package:linux
 
 ---
 
-## Contributing with Claude Code
-
-TractoDB is designed to be built and extended with [Claude Code](https://claude.ai/code). The project ships with detailed instruction files that give Claude full context:
-
-| File | Purpose |
-|---|---|
-| `CONTEXT.md` | **Start here** — full project context for new sessions |
-| `CLAUDE.md` | Architecture, conventions, commands |
-| `AGENTS.md` | Agent workflow rules and what NOT to do |
-| `DESIGN.md` | Complete visual design system (CSS variables, components) |
-| `TASKS.md` | Phase-by-phase implementation checklist |
-| `shared/ipc.ts` | IPC channel names and TypeScript types |
-
-### Starting a new Claude Code session
-
-```
-Read CONTEXT.md, CLAUDE.md, AGENTS.md, and DESIGN.md first.
-Then check TASKS.md and continue from the first uncompleted task.
-Do not ask me to repeat decisions already logged in CONTEXT.md.
-```
-
----
-
 ## Project Philosophy
 
 - **Management tool only** — TractoDB connects to your databases. It does not bundle or start any database engine (same approach as DBeaver).
