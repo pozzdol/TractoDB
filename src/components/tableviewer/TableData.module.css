@@ -50,17 +50,6 @@
   margin-bottom: var(--space-4);
 }
 
-.confirmSql {
-  padding: var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-tertiary);
-  border-radius: var(--radius-md);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 /* ─── Row-operation toolbar (injected into the grid toolbar) ─────────────── */
 .ops {
   display: flex;

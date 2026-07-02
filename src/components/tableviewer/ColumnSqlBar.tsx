@@ -4,7 +4,7 @@ import { useUiStore } from '@/store/uiStore'
 import styles from './ColumnSqlBar.module.css'
 
 export type Clause = 'WHERE' | 'ORDER BY' | 'LIMIT' | 'GROUP BY' | 'HAVING' | 'CUSTOM'
-export const CLAUSES: Clause[] = ['WHERE', 'ORDER BY', 'LIMIT', 'GROUP BY', 'HAVING', 'CUSTOM']
+const CLAUSES: Clause[] = ['WHERE', 'ORDER BY', 'LIMIT', 'GROUP BY', 'HAVING', 'CUSTOM']
 
 /** Build the full query for a clause + content (table name injected here). */
 export function buildClauseQuery(clause: Clause, qualified: string, content: string): string {
