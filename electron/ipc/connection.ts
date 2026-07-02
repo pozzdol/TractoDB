@@ -30,7 +30,7 @@ const SQL_ENGINES: ReadonlySet<DatabaseType> = new Set<DatabaseType>([
   'sqlite',
 ])
 
-export interface QueryOptions {
+interface QueryOptions {
   offset?: number
   limit?: number
 }

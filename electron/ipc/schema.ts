@@ -1,17 +1,13 @@
 import { ipcMain } from 'electron'
 import { IPC, ipcError, ipcSuccess } from '../../shared/ipc'
-import type { DropTableTarget } from '../../shared/ipc'
+import type { DatabaseType, DropTableTarget } from '../../shared/ipc'
 import { connectionManager } from './connection'
 import { describeError } from './drivers/base'
-
-function quoteIdent(type: string, name: string): string {
-  if (type === 'mysql') return `\`${name.replace(/`/g, '``')}\``
-  return `"${name.replace(/"/g, '""')}"`
-}
+import { quoteId } from './sqlUtil'
 
 /** Qualified DROP target + a human label for the success list / errors. */
-function dropStatement(type: string, t: DropTableTarget, cascade: boolean): { sql: string; label: string } {
-  const q = (s: string): string => quoteIdent(type, s)
+function dropStatement(type: DatabaseType, t: DropTableTarget, cascade: boolean): { sql: string; label: string } {
+  const q = (s: string): string => quoteId(type, s)
   if (type === 'mysql') {
     const ref = `${q(t.database)}.${q(t.name)}`
     return { sql: `DROP TABLE IF EXISTS ${ref}`, label: ref }

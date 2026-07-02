@@ -5,8 +5,6 @@ import os from 'node:os'
 import path from 'node:path'
 import type { SecretsBackend } from '../../shared/ipc'
 
-export type { SecretsBackend }
-
 /**
  * Password storage. Prefers the OS keychain (keytar); if that's unavailable
  * (e.g. libsecret not installed on Linux), falls back to an AES-256-GCM
