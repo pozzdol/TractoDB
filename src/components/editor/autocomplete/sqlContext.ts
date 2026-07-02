@@ -1,6 +1,6 @@
 import type * as monaco from 'monaco-editor'
 
-export interface CursorContext {
+interface CursorContext {
   inString: boolean
   inComment: boolean
   /** Unbalanced '(' open before the cursor — > 0 means inside a subquery/paren group. */
